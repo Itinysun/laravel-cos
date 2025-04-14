@@ -17,7 +17,7 @@ class LaravelCosServiceProvider extends PackageServiceProvider
          */
         $package
             ->name('laravel-cos')
-            ->hasConfigFile()
+            ->hasConfigFile('cos')
             ->hasCommand(LaravelCosCommand::class);
     }
 }

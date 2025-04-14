@@ -2,7 +2,7 @@
 
 // config for Itinysun/LaravelCos
 return [
-        'cos1' => [
+        'default' => [
             'app_id' => env('COS_APP_ID'),
             'secret_id' => env('COS_SECRET_ID'),
             'secret_key' => env('COS_SECRET_KEY'),

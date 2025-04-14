@@ -23,17 +23,12 @@ You can install the package via composer:
 composer require itinysun/laravel-cos
 ```
 
-You can publish and run the migrations with:
 
-```bash
-php artisan vendor:publish --tag="laravel-cos-migrations"
-php artisan migrate
-```
 
 You can publish the config file with:
 
 ```bash
-php artisan vendor:publish --tag="laravel-cos-config"
+php artisan vendor:publish --tag="cos-config"
 ```
 
 This is the contents of the published config file:
@@ -43,17 +38,10 @@ return [
 ];
 ```
 
-Optionally, you can publish the views using
-
-```bash
-php artisan vendor:publish --tag="laravel-cos-views"
-```
-
 ## Usage
 
 ```php
-$laravelCos = new Itinysun\LaravelCos();
-echo $laravelCos->echoPhrase('Hello, Itinysun!');
+$laravelCos = new Itinysun\LaravelCos('cos1');
 ```
 
 ## Testing
