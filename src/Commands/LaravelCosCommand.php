@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Itinysun\LaravelCos\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class LaravelCosCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'laravel-cos';
 
     public $description = 'My command';
 
