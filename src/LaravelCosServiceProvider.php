@@ -2,9 +2,9 @@
 
 namespace Itinysun\LaravelCos;
 
+use Itinysun\LaravelCos\Commands\LaravelCosCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Itinysun\LaravelCos\Commands\LaravelCosCommand;
 
 class LaravelCosServiceProvider extends PackageServiceProvider
 {

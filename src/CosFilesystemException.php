@@ -4,7 +4,4 @@ namespace Itinysun\LaravelCos;
 
 use League\Flysystem\FilesystemException;
 
-class CosFilesystemException extends \Exception implements  FilesystemException
-{
-
-}
+class CosFilesystemException extends \Exception implements FilesystemException {}

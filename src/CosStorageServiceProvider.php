@@ -2,9 +2,9 @@
 
 namespace Itinysun\LaravelCos;
 
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Filesystem\FilesystemAdapter;
 use League\Flysystem\Filesystem;
 
 class CosStorageServiceProvider extends ServiceProvider
@@ -16,6 +16,7 @@ class CosStorageServiceProvider extends ServiceProvider
     {
         Storage::extend('cos', function ($app, $config) {
             $adapter = new CosFilesystemAdapter($config);
+
             return new FilesystemAdapter(new Filesystem($adapter), $adapter);
         });
     }

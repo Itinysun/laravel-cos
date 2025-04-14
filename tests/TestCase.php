@@ -3,8 +3,8 @@
 namespace Itinysun\LaravelCos\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Orchestra\Testbench\TestCase as Orchestra;
 use Itinysun\LaravelCos\LaravelCosServiceProvider;
+use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {

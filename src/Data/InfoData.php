@@ -16,7 +16,7 @@ class InfoData extends Data
         #[MapInputName('Key')]
         public string $key,
         #[MapInputName('LastModified')]
-        #[WithCast(DateTimeInterfaceCast::class,format: 'Y-m-d\TH:i:s.v\Z')]
+        #[WithCast(DateTimeInterfaceCast::class, format: 'Y-m-d\TH:i:s.v\Z')]
         public Carbon $lastModified,
         #[MapInputName('Size')]
         public int $size,

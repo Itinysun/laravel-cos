@@ -2,7 +2,6 @@
 
 namespace Itinysun\LaravelCos;
 
-
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -18,7 +17,9 @@ use Qcloud\Cos\Exception\ServiceResponseException;
 readonly class LaravelCos
 {
     protected Client $client;
+
     protected array $config;
+
     protected string $bucket;
 
     /**
@@ -28,20 +29,20 @@ readonly class LaravelCos
     {
 
         try {
-            if (!$configName) {
+            if (! $configName) {
                 $config = config('cos.default');
             } else {
-                $config = config('cos.' . $configName);
+                $config = config('cos.'.$configName);
             }
             $this->client = new Client([
                 'region' => $config['region'],
                 'schema' => $config['use_https'] ? 'https' : 'http',
                 'credentials' => [
                     'secretId' => $config['secret_id'],
-                    'secretKey' => $config['secret_key']
-                ]
+                    'secretKey' => $config['secret_key'],
+                ],
             ]);
-            $this->bucket = $config['bucket'] . '-' . $config['app_id'];
+            $this->bucket = $config['bucket'].'-'.$config['app_id'];
             $this->config = $config;
         } catch (Exception $e) {
             throw new CosFilesystemException('you have to set cos config in config/cos.php');
@@ -56,7 +57,7 @@ readonly class LaravelCos
         try {
             return $this->client->doesObjectExist($this->bucket, $path);
         } catch (Exception $e) {
-            throw new CosFilesystemException('Check file exists failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Check file exists failed: '.$e->getMessage());
         }
     }
 
@@ -68,11 +69,11 @@ readonly class LaravelCos
         try {
             $this->client->deleteObject([
                 'Bucket' => $this->bucket,
-                'Key' => $path
+                'Key' => $path,
             ]);
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Delete failed: '.$e->getMessage());
         }
     }
 
@@ -83,21 +84,21 @@ readonly class LaravelCos
     {
         try {
             $files = $this->listObjects($path, true)?->getFiles();
-            if ($files && !$files->isEmpty()) {
+            if ($files && ! $files->isEmpty()) {
                 $list = $files->map(function ($file) {
                     return [
-                        'Key' => $file->key
+                        'Key' => $file->key,
                     ];
                 });
                 Log::warning('delete directory', ['path' => $path, 'sum' => $list->count()]);
                 $this->client->deleteObjects([
                     'Bucket' => $this->bucket,
-                    'Objects' => $list
+                    'Objects' => $list,
                 ]);
             }
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete directory failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Delete directory failed: '.$e->getMessage());
         }
     }
 
@@ -109,14 +110,15 @@ readonly class LaravelCos
                 'Bucket' => $this->bucket,
                 'Delimiter' => $recursive ? '' : '/',
                 'MaxKeys' => 1000,
-                'Prefix' => $directory
+                'Prefix' => $directory,
             ]);
             $data = $result->toArray();
         } catch (ServiceResponseException $e) {
             report($e);
+
             return null;
         }
-        if (!isset($data)) {
+        if (! isset($data)) {
             return null;
         }
         try {
@@ -124,10 +126,12 @@ readonly class LaravelCos
             if ($list->isTruncated) {
                 throw new Exception('List is truncated, please use pagination');
             }
+
             return $list;
         } catch (\Exception $e) {
-            Log::error('Error when parsing listObjects response: ' . $e->getMessage());
+            Log::error('Error when parsing listObjects response: '.$e->getMessage());
             report($e);
+
             return null;
         }
 
@@ -138,7 +142,7 @@ readonly class LaravelCos
      */
     public function uploadFile($key, $filePath): void
     {
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             throw new Exception("File not found: $filePath");
         }
         $handle = fopen($filePath, 'rb');
@@ -154,15 +158,16 @@ readonly class LaravelCos
             $this->client->putObject([
                 'Bucket' => $this->bucket,
                 'Key' => Str::finish($key, '/'),
-                'Body' => ''
+                'Body' => '',
             ]);
         } catch (Exception $e) {
-            throw new UnableToCreateDirectory('create directory failed: ' . $e->getMessage());
+            throw new UnableToCreateDirectory('create directory failed: '.$e->getMessage());
         }
     }
 
     /**
      * @throws UnableToWriteFile
+     *
      * @see https://cloud.tencent.com/document/product/436/64283#.E7.AE.80.E5.8D.95.E4.B8.8A.E4.BC.A0.E5.AF.B9.E8.B1.A1
      */
     public function uploadData(string $key, mixed $data, CosStorageClass $class = CosStorageClass::STANDARD, array $config = []): void
@@ -171,7 +176,7 @@ readonly class LaravelCos
             $opt = [
                 'Bucket' => $this->bucket,
                 'Key' => $key,
-                'Body' => $data
+                'Body' => $data,
             ];
             if ($class && $class != CosStorageClass::STANDARD) {
                 $opt['StorageClass'] = $class->value;
@@ -182,7 +187,7 @@ readonly class LaravelCos
             $this->client->putObject($opt);
         } catch (\Throwable $e) {
             report($e);
-            throw new UnableToWriteFile('Upload failed: ' . $e->getMessage());
+            throw new UnableToWriteFile('Upload failed: '.$e->getMessage());
         }
     }
 
@@ -192,13 +197,13 @@ readonly class LaravelCos
     public function download($key, $target): void
     {
         try {
-            $this->client->download($this->bucket, $key, $target, array(
-                'PartSize' => 20 * 1024 * 1024, //分块大小
-                'Concurrency' => 1, //并发数
-            ));
+            $this->client->download($this->bucket, $key, $target, [
+                'PartSize' => 20 * 1024 * 1024, // 分块大小
+                'Concurrency' => 1, // 并发数
+            ]);
         } catch (\Throwable $e) {
             report($e);
-            throw new Exception('Download failed: ' . $e->getMessage());
+            throw new Exception('Download failed: '.$e->getMessage());
         }
     }
 
@@ -207,11 +212,12 @@ readonly class LaravelCos
         try {
             $result = $this->client->getObject([
                 'Bucket' => $this->bucket,
-                'Key' => $key
+                'Key' => $key,
             ]);
+
             return $result['Body'];
         } catch (Exception $e) {
-            throw UnableToReadFile::fromLocation($key, (string)$e);
+            throw UnableToReadFile::fromLocation($key, (string) $e);
         }
     }
 
@@ -223,12 +229,13 @@ readonly class LaravelCos
         try {
             $result = $this->client->ImageInfo([
                 'Bucket' => $this->bucket,
-                'Key' => $key
+                'Key' => $key,
             ]);
+
             return ImageInfo::from($result['Data']);
         } catch (Exception $e) {
             report($e);
-            throw new Exception('Get pic info failed: ' . $e->getMessage());
+            throw new Exception('Get pic info failed: '.$e->getMessage());
         }
     }
 
@@ -237,7 +244,7 @@ readonly class LaravelCos
         $this->client->copy($this->bucket, $to, [
             'Region' => $this->config['region'],
             'Bucket' => $this->bucket,
-            'Key' => $from
+            'Key' => $from,
         ]);
     }
 

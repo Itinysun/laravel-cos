@@ -16,6 +16,7 @@ use League\Flysystem\UrlGeneration\TemporaryUrlGenerator;
 class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 {
     protected PathPrefixer $prefixer;
+
     protected LaravelCos $cos;
 
     /**
@@ -27,16 +28,17 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
         $this->prefixer = new PathPrefixer($config['prefix'] ?? '');
     }
 
-
     public function fileExists(string $path): bool
     {
         $prefixedPath = $this->prefixer->prefixPath($path);
+
         return $this->cos->exists($prefixedPath);
     }
 
     public function directoryExists(string $path): bool
     {
         $prefixedPath = $this->prefixer->prefixPath($path);
+
         return $this->cos->exists($prefixedPath);
     }
 
@@ -65,6 +67,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
             fwrite($stream, $contents);
             // 将文件指针重置到流的开头，以便可以从头开始读取
             fseek($stream, 0);
+
             return $stream;
         } catch (\Exception $e) {
             throw new CosFilesystemException($prefixedPath, $e);
@@ -75,6 +78,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         try {
             $prefixedPath = $this->prefixer->prefixPath($path);
+
             return $this->cos->getData($prefixedPath);
         } catch (\Exception $e) {
             throw new UnableToReadFile($path, $e);

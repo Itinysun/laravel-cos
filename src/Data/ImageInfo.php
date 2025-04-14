@@ -2,8 +2,8 @@
 
 namespace Itinysun\LaravelCos\Data;
 
-use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Attributes\MapName;
+use Spatie\LaravelData\Data;
 
 class ImageInfo extends Data
 {
@@ -23,6 +23,5 @@ class ImageInfo extends Data
         public int $verticalDpi = 0,
         #[MapName('horizontal_dpi')]
         public int $horizontalDpi = 0,
-    ) {
-    }
+    ) {}
 }
