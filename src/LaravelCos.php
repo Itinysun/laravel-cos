@@ -279,7 +279,7 @@ readonly class LaravelCos
     /**
      * @throws CosFilesystemException
      */
-    public function getFileAcl(string $key)
+    public function getFileAcl(string $key): ObjectAcl
     {
 
         try {
@@ -306,10 +306,11 @@ readonly class LaravelCos
                     }
                 }
             }
+            // Default to private if no public permission found
+            return ObjectAcl::PRIVATE;
         } catch (Exception $e) {
             throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
         }
-        throw new CosFilesystemException('getFileAcl failed,no permission found');
     }
 
     public function setFileAttr($key, FileAttr $attr): void
@@ -321,6 +322,17 @@ readonly class LaravelCos
         ];
         $options = $attr->toArray();
         $this->client->copyObject(array_merge($options, $data));
+    }
+
+    public function getFileAttr($key): FileAttr
+    {
+        $result = $this->client->getObject([
+            'Bucket' => $this->bucket,
+            'Key' => $key,
+        ]);
+        $data = $result->toArray();
+        print_r($data);
+        return FileAttr::from($data);
     }
 
     public function fixedUrl(string $key)

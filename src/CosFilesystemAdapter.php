@@ -125,7 +125,17 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 
     public function visibility(string $path): FileAttributes
     {
-        // TODO: Implement visibility() method.
+        $prefixedPath = $this->prefixer->prefixPath($path);
+        try {
+            $acl = $this->cos->getFileAcl($prefixedPath);
+            if($acl === ObjectAcl::PUBLIC_READ) {
+                return new FileAttributes($path, Visibility::PUBLIC);
+            } {
+                return new FileAttributes($path, Visibility::PRIVATE);
+            }
+        } catch (\Exception $e) {
+            throw new CosFilesystemException('Get visibility failed: ' . $e->getMessage());
+        }
     }
 
     public function mimeType(string $path): FileAttributes

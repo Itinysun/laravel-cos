@@ -5,17 +5,17 @@
  * It is only used for local testing and should not be uploaded to the repository.
  */
 $currentDir = __DIR__ . '/';
-if(!file_exists($currentDir . 'cos_config.php')) {
+if (!file_exists($currentDir . 'cos_config.php')) {
     file_put_contents($currentDir . 'cos_config.php', '<?php return [];');
 }
 $config = [];
 /**
  * @throws Exception
  */
-function getConfig():array
+function getConfig(): array
 {
     global $config;
-    if(empty($config)) {
+    if (empty($config)) {
         $config = include __DIR__ . '/cos_config.php';
     }
     if (!is_array($config)) {
@@ -24,9 +24,25 @@ function getConfig():array
     return $config;
 }
 
+$client = null;
+function getCos()
+{
+    global $client;
+    if ($client) {
+        return $client;
+    }
+    \Illuminate\Support\Facades\Config::set('cos.default', getConfig());
+    return new \Itinysun\LaravelCos\LaravelCos();
+}
+
 it('test acl success', function () {
-    \Illuminate\Support\Facades\Config::set('cos.default',getConfig());
-    $laravelCos = new \Itinysun\LaravelCos\LaravelCos();
+    $laravelCos = getCos();
     $acl = $laravelCos->getFileAcl('2025/01/01JH85ZBKZ9VCW0BF2V529P770.jpg');
     $this->assertEquals($acl, \Itinysun\LaravelCos\Enums\ObjectAcl::PUBLIC_READ);
+});
+
+it('test attr success', function () {
+    $laravelCos = getCos();
+    $attr = $laravelCos->getFileAttr('2025/01/01JH85ZBKZ9VCW0BF2V529P770.jpg');
+    $this->assertEquals($attr->storageClass, \Itinysun\LaravelCos\Enums\StorageClass::STANDARD);
 });
