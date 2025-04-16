@@ -2,10 +2,9 @@
 
 namespace Itinysun\LaravelCos\Enums;
 
-use Illuminate\Validation\Rules\Enum;
 use League\Flysystem\Visibility;
 
-enum ObjectAcl:string
+enum ObjectAcl: string
 {
     case PRIVATE = 'private'; // 私有读写
     case PUBLIC_READ = 'public-read'; // 公有读私有写
@@ -14,7 +13,8 @@ enum ObjectAcl:string
     case BUCKET_OWNER_READ = 'bucket-owner-read'; // 桶拥有者读
     case BUCKET_OWNER_FULL_CONTROL = 'bucket-owner-full-control'; // 桶拥有者完全控制
 
-    public function label(): string{
+    public function label(): string
+    {
         return match ($this) {
             self::PRIVATE => '私有读写',
             self::PUBLIC_READ => '公有读私有写',
@@ -25,7 +25,7 @@ enum ObjectAcl:string
         };
     }
 
-    public static function fromString (string $value): self
+    public static function fromString(string $value): self
     {
         return match ($value) {
             'private' => self::PRIVATE,
@@ -36,6 +36,7 @@ enum ObjectAcl:string
             default => self::DEFAULT,
         };
     }
+
     public static function fromVisibility(string $visibility): self
     {
         return match ($visibility) {
@@ -44,6 +45,7 @@ enum ObjectAcl:string
             default => self::DEFAULT,
         };
     }
+
     public static function fromPermission(string $permission): self
     {
         return match ($permission) {
