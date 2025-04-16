@@ -3,11 +3,14 @@
 namespace Itinysun\LaravelCos;
 
 use Exception;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Itinysun\LaravelCos\Data\FileAttr;
 use Itinysun\LaravelCos\Data\ImageInfo;
 use Itinysun\LaravelCos\Data\ListData;
-use Itinysun\LaravelCos\Enums\CosStorageClass;
+use Itinysun\LaravelCos\Enums\ObjectAcl;
+use Itinysun\LaravelCos\Enums\StorageClass;
 use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
@@ -29,10 +32,10 @@ readonly class LaravelCos
     {
 
         try {
-            if (! $configName) {
+            if (!$configName) {
                 $config = config('cos.default');
             } else {
-                $config = config('cos.'.$configName);
+                $config = config('cos.' . $configName);
             }
             $this->client = new Client([
                 'region' => $config['region'],
@@ -42,7 +45,7 @@ readonly class LaravelCos
                     'secretKey' => $config['secret_key'],
                 ],
             ]);
-            $this->bucket = $config['bucket'].'-'.$config['app_id'];
+            $this->bucket = $config['bucket'] . '-' . $config['app_id'];
             $this->config = $config;
         } catch (Exception $e) {
             throw new CosFilesystemException('you have to set cos config in config/cos.php');
@@ -57,7 +60,7 @@ readonly class LaravelCos
         try {
             return $this->client->doesObjectExist($this->bucket, $path);
         } catch (Exception $e) {
-            throw new CosFilesystemException('Check file exists failed: '.$e->getMessage());
+            throw new CosFilesystemException('Check file exists failed: ' . $e->getMessage());
         }
     }
 
@@ -73,7 +76,7 @@ readonly class LaravelCos
             ]);
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete failed: '.$e->getMessage());
+            throw new CosFilesystemException('Delete failed: ' . $e->getMessage());
         }
     }
 
@@ -84,7 +87,7 @@ readonly class LaravelCos
     {
         try {
             $files = $this->listObjects($path, true)?->getFiles();
-            if ($files && ! $files->isEmpty()) {
+            if ($files && !$files->isEmpty()) {
                 $list = $files->map(function ($file) {
                     return [
                         'Key' => $file->key,
@@ -98,7 +101,7 @@ readonly class LaravelCos
             }
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete directory failed: '.$e->getMessage());
+            throw new CosFilesystemException('Delete directory failed: ' . $e->getMessage());
         }
     }
 
@@ -118,7 +121,7 @@ readonly class LaravelCos
 
             return null;
         }
-        if (! isset($data)) {
+        if (!isset($data)) {
             return null;
         }
         try {
@@ -129,7 +132,7 @@ readonly class LaravelCos
 
             return $list;
         } catch (\Exception $e) {
-            Log::error('Error when parsing listObjects response: '.$e->getMessage());
+            Log::error('Error when parsing listObjects response: ' . $e->getMessage());
             report($e);
 
             return null;
@@ -142,7 +145,7 @@ readonly class LaravelCos
      */
     public function uploadFile($key, $filePath): void
     {
-        if (! file_exists($filePath)) {
+        if (!file_exists($filePath)) {
             throw new Exception("File not found: $filePath");
         }
         $handle = fopen($filePath, 'rb');
@@ -161,7 +164,7 @@ readonly class LaravelCos
                 'Body' => '',
             ]);
         } catch (Exception $e) {
-            throw new UnableToCreateDirectory('create directory failed: '.$e->getMessage());
+            throw new UnableToCreateDirectory('create directory failed: ' . $e->getMessage());
         }
     }
 
@@ -170,7 +173,7 @@ readonly class LaravelCos
      *
      * @see https://cloud.tencent.com/document/product/436/64283#.E7.AE.80.E5.8D.95.E4.B8.8A.E4.BC.A0.E5.AF.B9.E8.B1.A1
      */
-    public function uploadData(string $key, mixed $data, CosStorageClass $class = CosStorageClass::STANDARD, array $config = []): void
+    public function uploadData(string $key, mixed $data, StorageClass $class = StorageClass::STANDARD, array $config = []): void
     {
         try {
             $opt = [
@@ -178,7 +181,7 @@ readonly class LaravelCos
                 'Key' => $key,
                 'Body' => $data,
             ];
-            if ($class && $class != CosStorageClass::STANDARD) {
+            if ($class && $class != StorageClass::STANDARD) {
                 $opt['StorageClass'] = $class->value;
             }
             if ($config) {
@@ -187,7 +190,7 @@ readonly class LaravelCos
             $this->client->putObject($opt);
         } catch (\Throwable $e) {
             report($e);
-            throw new UnableToWriteFile('Upload failed: '.$e->getMessage());
+            throw new UnableToWriteFile('Upload failed: ' . $e->getMessage());
         }
     }
 
@@ -203,7 +206,7 @@ readonly class LaravelCos
             ]);
         } catch (\Throwable $e) {
             report($e);
-            throw new Exception('Download failed: '.$e->getMessage());
+            throw new Exception('Download failed: ' . $e->getMessage());
         }
     }
 
@@ -217,7 +220,7 @@ readonly class LaravelCos
 
             return $result['Body'];
         } catch (Exception $e) {
-            throw UnableToReadFile::fromLocation($key, (string) $e);
+            throw UnableToReadFile::fromLocation($key, (string)$e);
         }
     }
 
@@ -235,7 +238,7 @@ readonly class LaravelCos
             return ImageInfo::from($result['Data']);
         } catch (Exception $e) {
             report($e);
-            throw new Exception('Get pic info failed: '.$e->getMessage());
+            throw new Exception('Get pic info failed: ' . $e->getMessage());
         }
     }
 
@@ -246,6 +249,78 @@ readonly class LaravelCos
             'Bucket' => $this->bucket,
             'Key' => $from,
         ]);
+    }
+
+    protected function buildFullPath(string $key, ?string $version = null): string
+    {
+        $full = "{$this->bucket}.cos.{$this->config['region']}.myqcloud.com/{$key}";
+        if ($version) {
+            $full .= '?versionId=' . $version;
+        }
+        return $full;
+    }
+
+    /**
+     * @throws CosFilesystemException
+     */
+    public function setFileAcl(string $key, ObjectAcl $acl): void
+    {
+        try {
+            $this->client->putObjectAcl([
+                'Bucket' => $this->bucket,
+                'Key' => $key,
+                'ACL' => $acl->value,
+            ]);
+        } catch (Exception $e) {
+            throw new CosFilesystemException('setFileAcl failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @throws CosFilesystemException
+     */
+    public function getFileAcl(string $key)
+    {
+
+        try {
+            $result = $this->client->getObjectAcl([
+                'Bucket' => $this->bucket,
+                'Key' => $key,
+            ]);
+            $grants = Arr::get($result->toArray(), 'Grants', []);
+        } catch (Exception $e) {
+            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
+        }
+        if (empty($grants)) {
+            throw new CosFilesystemException('getFileAcl failed,no grants found');
+        }
+        try {
+            foreach ($grants as $grant) {
+                foreach ($grant as $grantValue) {
+                    foreach ($grantValue as $value) {
+                        $uri = Arr::get($value, 'Grantee.URI', false);
+                        if ($uri && Str::endsWith($uri, 'AllUsers')) {
+                            $permission = $value['Permission'];
+                            return ObjectAcl::fromPermission($permission);
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
+        }
+        throw new CosFilesystemException('getFileAcl failed,no permission found');
+    }
+
+    public function setFileAttr($key, FileAttr $attr): void
+    {
+        $data = [
+            'key' => $key,
+            'bucket' => $this->bucket,
+            'copy_source' => $this->buildFullPath($key),
+        ];
+        $options = $attr->toArray();
+        $this->client->copyObject(array_merge($options, $data));
     }
 
     public function fixedUrl(string $key)

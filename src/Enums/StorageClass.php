@@ -2,7 +2,7 @@
 
 namespace Itinysun\LaravelCos\Enums;
 
-enum CosStorageClass: string
+enum StorageClass: string
 {
     case STANDARD = 'STANDARD'; // 标准存储
     case STANDARD_IA = 'STANDARD_IA'; // 低频存储

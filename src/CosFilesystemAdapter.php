@@ -3,6 +3,7 @@
 namespace Itinysun\LaravelCos;
 
 use DateTimeInterface;
+use Itinysun\LaravelCos\Enums\ObjectAcl;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
@@ -12,6 +13,7 @@ use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
 use League\Flysystem\UrlGeneration\TemporaryUrlGenerator;
+use League\Flysystem\Visibility;
 
 class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 {
@@ -107,12 +109,18 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 
     public function createDirectory(string $path, Config $config): void
     {
-        $this->cos->createDirectory($path, $config);
+        $this->cos->createDirectory($path);
     }
 
     public function setVisibility(string $path, string $visibility): void
     {
-        // TODO: Implement setVisibility() method.
+
+        try {
+            $prefixedPath = $this->prefixer->prefixPath($path);
+            $this->cos->setFileAcl($prefixedPath, ObjectAcl::fromVisibility($visibility));
+        } catch (\Exception $e) {
+            throw new CosFilesystemException('Set visibility failed: ' . $e->getMessage());
+        }
     }
 
     public function visibility(string $path): FileAttributes
@@ -147,7 +155,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 
     public function copy(string $source, string $destination, Config $config): void
     {
-        // TODO: Implement copy() method.
+        $this->cos->copy($source, $destination);
     }
 
     public function temporaryUrl(string $path, DateTimeInterface $expiresAt, Config $config): string
