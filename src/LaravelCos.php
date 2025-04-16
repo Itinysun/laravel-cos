@@ -32,10 +32,10 @@ readonly class LaravelCos
     {
 
         try {
-            if (!$configName) {
+            if (! $configName) {
                 $config = config('cos.default');
             } else {
-                $config = config('cos.' . $configName);
+                $config = config('cos.'.$configName);
             }
             $this->client = new Client([
                 'region' => $config['region'],
@@ -45,7 +45,7 @@ readonly class LaravelCos
                     'secretKey' => $config['secret_key'],
                 ],
             ]);
-            $this->bucket = $config['bucket'] . '-' . $config['app_id'];
+            $this->bucket = $config['bucket'].'-'.$config['app_id'];
             $this->config = $config;
         } catch (Exception $e) {
             throw new CosFilesystemException('you have to set cos config in config/cos.php');
@@ -60,7 +60,7 @@ readonly class LaravelCos
         try {
             return $this->client->doesObjectExist($this->bucket, $path);
         } catch (Exception $e) {
-            throw new CosFilesystemException('Check file exists failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Check file exists failed: '.$e->getMessage());
         }
     }
 
@@ -76,7 +76,7 @@ readonly class LaravelCos
             ]);
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Delete failed: '.$e->getMessage());
         }
     }
 
@@ -87,7 +87,7 @@ readonly class LaravelCos
     {
         try {
             $files = $this->listObjects($path, true)?->getFiles();
-            if ($files && !$files->isEmpty()) {
+            if ($files && ! $files->isEmpty()) {
                 $list = $files->map(function ($file) {
                     return [
                         'Key' => $file->key,
@@ -101,7 +101,7 @@ readonly class LaravelCos
             }
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete directory failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Delete directory failed: '.$e->getMessage());
         }
     }
 
@@ -121,7 +121,7 @@ readonly class LaravelCos
 
             return null;
         }
-        if (!isset($data)) {
+        if (! isset($data)) {
             return null;
         }
         try {
@@ -132,7 +132,7 @@ readonly class LaravelCos
 
             return $list;
         } catch (\Exception $e) {
-            Log::error('Error when parsing listObjects response: ' . $e->getMessage());
+            Log::error('Error when parsing listObjects response: '.$e->getMessage());
             report($e);
 
             return null;
@@ -145,7 +145,7 @@ readonly class LaravelCos
      */
     public function uploadFile($key, $filePath): void
     {
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             throw new Exception("File not found: $filePath");
         }
         $handle = fopen($filePath, 'rb');
@@ -164,7 +164,7 @@ readonly class LaravelCos
                 'Body' => '',
             ]);
         } catch (Exception $e) {
-            throw new UnableToCreateDirectory('create directory failed: ' . $e->getMessage());
+            throw new UnableToCreateDirectory('create directory failed: '.$e->getMessage());
         }
     }
 
@@ -190,7 +190,7 @@ readonly class LaravelCos
             $this->client->putObject($opt);
         } catch (\Throwable $e) {
             report($e);
-            throw new UnableToWriteFile('Upload failed: ' . $e->getMessage());
+            throw new UnableToWriteFile('Upload failed: '.$e->getMessage());
         }
     }
 
@@ -206,7 +206,7 @@ readonly class LaravelCos
             ]);
         } catch (\Throwable $e) {
             report($e);
-            throw new Exception('Download failed: ' . $e->getMessage());
+            throw new Exception('Download failed: '.$e->getMessage());
         }
     }
 
@@ -220,7 +220,7 @@ readonly class LaravelCos
 
             return $result['Body'];
         } catch (Exception $e) {
-            throw UnableToReadFile::fromLocation($key, (string)$e);
+            throw UnableToReadFile::fromLocation($key, (string) $e);
         }
     }
 
@@ -238,7 +238,7 @@ readonly class LaravelCos
             return ImageInfo::from($result['Data']);
         } catch (Exception $e) {
             report($e);
-            throw new Exception('Get pic info failed: ' . $e->getMessage());
+            throw new Exception('Get pic info failed: '.$e->getMessage());
         }
     }
 
@@ -255,8 +255,9 @@ readonly class LaravelCos
     {
         $full = "{$this->bucket}.cos.{$this->config['region']}.myqcloud.com/{$key}";
         if ($version) {
-            $full .= '?versionId=' . $version;
+            $full .= '?versionId='.$version;
         }
+
         return $full;
     }
 
@@ -272,7 +273,7 @@ readonly class LaravelCos
                 'ACL' => $acl->value,
             ]);
         } catch (Exception $e) {
-            throw new CosFilesystemException('setFileAcl failed: ' . $e->getMessage());
+            throw new CosFilesystemException('setFileAcl failed: '.$e->getMessage());
         }
     }
 
@@ -289,7 +290,7 @@ readonly class LaravelCos
             ]);
             $grants = Arr::get($result->toArray(), 'Grants', []);
         } catch (Exception $e) {
-            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
+            throw new CosFilesystemException('getFileAcl failed: '.$e->getMessage());
         }
         if (empty($grants)) {
             throw new CosFilesystemException('getFileAcl failed,no grants found');
@@ -301,6 +302,7 @@ readonly class LaravelCos
                         $uri = Arr::get($value, 'Grantee.URI', false);
                         if ($uri && Str::endsWith($uri, 'AllUsers')) {
                             $permission = $value['Permission'];
+
                             return ObjectAcl::fromPermission($permission);
                         }
                     }
@@ -309,7 +311,7 @@ readonly class LaravelCos
             // Default to private if no public permission found
             return ObjectAcl::PRIVATE;
         } catch (Exception $e) {
-            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
+            throw new CosFilesystemException('getFileAcl failed: '.$e->getMessage());
         }
     }
 

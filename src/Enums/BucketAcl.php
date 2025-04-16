@@ -4,14 +4,15 @@ namespace Itinysun\LaravelCos\Enums;
 
 use Itinysun\LaravelCos\CosFilesystemException;
 
-enum BucketAcl:string
+enum BucketAcl: string
 {
     case PRIVATE = 'private'; // 私有读写
     case PUBLIC_READ = 'public-read'; // 公有读私有写
     case PUBLIC_READ_WRITE = 'public-read-write'; // 公有读写
     case AUTHENTICATED_READ = 'authenticated-read'; // 认证读写
 
-    public function label(): string{
+    public function label(): string
+    {
         return match ($this) {
             self::PRIVATE => '私有读写',
             self::PUBLIC_READ => '公有读私有写',
@@ -23,7 +24,7 @@ enum BucketAcl:string
     /**
      * @throws CosFilesystemException
      */
-    public static function fromString (string $value): self
+    public static function fromString(string $value): self
     {
         return match ($value) {
             'private' => self::PRIVATE,

@@ -14,14 +14,14 @@ class InfoData extends Data
 {
     public function __construct(
         #[MapInputName('Key')]
-        public string       $key,
+        public string $key,
         #[MapInputName('LastModified')]
         #[WithCast(DateTimeInterfaceCast::class, format: 'Y-m-d\TH:i:s.v\Z')]
-        public Carbon       $lastModified,
+        public Carbon $lastModified,
         #[MapInputName('Size')]
-        public int          $size,
+        public int $size,
         #[MapInputName('ETag')]
-        public string       $eTag,
+        public string $eTag,
         #[MapInputName('StorageClass')]
         #[WithCast(EnumCast::class)]
         public StorageClass $storageClass,

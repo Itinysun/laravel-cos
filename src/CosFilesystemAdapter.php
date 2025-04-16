@@ -119,7 +119,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
             $prefixedPath = $this->prefixer->prefixPath($path);
             $this->cos->setFileAcl($prefixedPath, ObjectAcl::fromVisibility($visibility));
         } catch (\Exception $e) {
-            throw new CosFilesystemException('Set visibility failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Set visibility failed: '.$e->getMessage());
         }
     }
 
