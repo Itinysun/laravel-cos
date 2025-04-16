@@ -5,8 +5,9 @@ namespace Itinysun\LaravelCos\Data;
 use Itinysun\LaravelCos\Enums\ObjectAcl;
 use Itinysun\LaravelCos\Enums\StorageClass;
 use Spatie\LaravelData\Attributes\MapName;
+use Spatie\LaravelData\Data;
 
-class FileUploadAttr extends FileAttr
+class FileUploadAttr extends Data
 {
     #[mapName('Progress')]
     public mixed $progressCallback;
@@ -17,7 +18,7 @@ class FileUploadAttr extends FileAttr
     #[mapName('ACL')]
     public ObjectAcl $acl;
     #[mapName('CacheControl')]
-    public string $cacheControl;
+    public ?string $cacheControl;
     #[mapName('ContentDisposition')]
     public string $contentDisposition;
     #[mapName('ContentEncoding')]

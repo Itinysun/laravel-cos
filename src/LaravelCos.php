@@ -333,7 +333,6 @@ readonly class LaravelCos
             'Key' => $key,
         ]);
         $data = $result->toArray();
-        print_r($data);
         return FileAttr::from($data);
     }
 

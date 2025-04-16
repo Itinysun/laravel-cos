@@ -2,18 +2,26 @@
 
 namespace Itinysun\LaravelCos\Data;
 
-use Itinysun\LaravelCos\Enums\ObjectAcl;
+use Carbon\Carbon;
 use Itinysun\LaravelCos\Enums\StorageClass;
+use League\Flysystem\FileAttributes;
+use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapName;
+use Spatie\LaravelData\Attributes\WithCast;
+use Spatie\LaravelData\Casts\DateTimeInterfaceCast;
+use Spatie\LaravelData\Casts\EnumCast;
 use Spatie\LaravelData\Data;
 
 class FileAttr extends Data
 {
-
+    #[mapName('Key')]
+    public string $key;
     #[mapName('StorageClass')]
+    #[WithCast(EnumCast::class)]
     public StorageClass $storageClass;
-    #[mapName('LastModified')]
-    public string $lastModified;
+    #[MapInputName('LastModified')]
+    #[WithCast(DateTimeInterfaceCast::class, format: 'D, d M Y H:i:s T')]
+    public Carbon $lastModified;
     #[mapName('CacheControl')]
     public ?string $cacheControl;
     #[mapName('ContentType')]
@@ -29,7 +37,7 @@ class FileAttr extends Data
     #[mapName('Expires')]
     public ?string $expires;
     #[mapName('Metadata')]
-    public array $metadata;
+    public ?array $metadata;
     #[mapName('ServerSideEncryption')]
     public string $serverSideEncryption;
     #[mapName('ETag')]
@@ -49,5 +57,10 @@ class FileAttr extends Data
 
     //for storage tier
     #[mapName('StorageTier')]
-    public ?StorageClass $storageTier;
+    public ?string $storageTier;
+
+    public function toFileAttributes(): FileAttributes
+    {
+        return new FileAttributes($this->key, $this->contentLength ?? null, null, $this->lastModified->timestamp, $this->contentType ?? null);
+    }
 }

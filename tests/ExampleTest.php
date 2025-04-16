@@ -1,48 +1,85 @@
 <?php
 
-/*
- * cos_config.php is a configuration file for the Laravel COS package.
- * It is only used for local testing and should not be uploaded to the repository.
- */
-$currentDir = __DIR__ . '/';
-if (!file_exists($currentDir . 'cos_config.php')) {
-    file_put_contents($currentDir . 'cos_config.php', '<?php return [];');
-}
-$config = [];
-/**
- * @throws Exception
- */
-function getConfig(): array
-{
-    global $config;
-    if (empty($config)) {
-        $config = include __DIR__ . '/cos_config.php';
-    }
-    if (!is_array($config)) {
-        throw new \Exception('cos_config.php must return an array');
-    }
-    return $config;
-}
+beforeEach(function () {
 
-$client = null;
-function getCos()
-{
-    global $client;
-    if ($client) {
-        return $client;
-    }
-    \Illuminate\Support\Facades\Config::set('cos.default', getConfig());
-    return new \Itinysun\LaravelCos\LaravelCos();
-}
+})->skip(fn() => empty(config('cos.default')), 'cos_config.php is empty');
 
-it('test acl success', function () {
-    $laravelCos = getCos();
-    $acl = $laravelCos->getFileAcl('2025/01/01JH85ZBKZ9VCW0BF2V529P770.jpg');
-    $this->assertEquals($acl, \Itinysun\LaravelCos\Enums\ObjectAcl::PUBLIC_READ);
+$testFile = [
+    'key' => 'test/test.txt',
+];
+
+describe('test cos sdk', function () use ($testFile) {
+    it('can write file', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos->uploadData($key, 'test');
+        $this->assertTrue($laravelCos->exists($key));
+    })->with($testFile);
+
+    it('can read file', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $data = $laravelCos->getData($key);
+        $this->assertEquals($data, 'test');
+    })->with($testFile);
+
+    it('can download file', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $result = $laravelCos->download($key, './test.txt');
+        $this->assertFileExists('./test.txt');
+    })->with($testFile);
+
+    it('can delete file', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos->delete($key);
+        $this->assertFalse($laravelCos->exists($key));
+    })->with($testFile);
+
+    it('can upload file', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos->uploadFile($key, './test.txt');
+        $this->assertTrue($laravelCos->exists($key));
+    })->with($testFile);
+
+
+    it('test acl success', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $acl = $laravelCos->getFileAcl($key);
+        $this->assertEquals($acl, \Itinysun\LaravelCos\Enums\ObjectAcl::PRIVATE);
+    })->with($testFile);
+
+    it('test attr success', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $attr = $laravelCos->getFileAttr($key);
+        $this->assertEquals($attr->key, $key);
+    })->with($testFile);
 });
 
-it('test attr success', function () {
-    $laravelCos = getCos();
-    $attr = $laravelCos->getFileAttr('2025/01/01JH85ZBKZ9VCW0BF2V529P770.jpg');
-    $this->assertEquals($attr->storageClass, \Itinysun\LaravelCos\Enums\StorageClass::STANDARD);
+describe('test flysystem adapter',function () use ($testFile){
+    it('can write file', function ($key) {
+        \Illuminate\Support\Facades\Storage::disk('cos')->put($key, 'test');
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
+    })->with($testFile);
+    it('can read file', function ($key) {
+        $data = \Illuminate\Support\Facades\Storage::disk('cos')->get($key);
+        $this->assertEquals($data, 'test');
+    })->with($testFile);
+    it('can delete file', function ($key) {
+        \Illuminate\Support\Facades\Storage::disk('cos')->delete($key);
+        $this->assertFalse(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
+    })->with($testFile);
+
+    it('can write stream', function ($key) {
+        $stream = fopen('php://temp', 'r+');
+        fwrite($stream, 'test');
+        rewind($stream);
+        \Illuminate\Support\Facades\Storage::disk('cos')->writeStream($key, $stream);
+        fclose($stream);
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
+    })->with($testFile);
+
+        it('can read stream', function ($key) {
+        $stream = \Illuminate\Support\Facades\Storage::disk('cos')->readStream($key);
+        $data = stream_get_contents($stream);
+        fclose($stream);
+        $this->assertEquals($data, 'test');
+    })->with($testFile);
 });

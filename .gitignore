@@ -33,3 +33,4 @@ testbench.yaml
 
 # Test Files
 /tests/cos_config.php
+/test.txt
