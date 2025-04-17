@@ -21,7 +21,7 @@ class FileAttr extends Data
     public StorageClass $storageClass;
     #[MapInputName('LastModified')]
     #[WithCast(DateTimeInterfaceCast::class, format: 'D, d M Y H:i:s T')]
-    public Carbon $lastModified;
+    public ?Carbon $lastModified;
     #[mapName('CacheControl')]
     public ?string $cacheControl;
     #[mapName('ContentType')]

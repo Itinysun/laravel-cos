@@ -32,5 +32,6 @@ testbench.yaml
 /coverage
 
 # Test Files
-/tests/cos_config.php
+/test_config.php
 /test.txt
+/test.log

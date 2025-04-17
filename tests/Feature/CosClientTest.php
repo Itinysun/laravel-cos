@@ -7,6 +7,9 @@ describe('test cos sdk', function () {
     $testFile = [
         'key' => 'test/test2.txt',
     ];
+    $testDir = [
+        'test/test2',
+    ];
     it('can write file', function ($key) {
         $laravelCos = new Itinysun\LaravelCos\LaravelCos();
         $laravelCos->uploadData($key, 'test');
@@ -28,6 +31,7 @@ describe('test cos sdk', function () {
 
     it('can delete file', function ($key) {
         $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos->uploadData($key, 'test');
         $laravelCos->delete($key);
         $this->assertFalse($laravelCos->exists($key));
     })->with($testFile);
@@ -50,4 +54,12 @@ describe('test cos sdk', function () {
         $attr = $laravelCos->getFileAttr($key);
         $this->assertEquals($attr->key, $key);
     })->with($testFile);
+
+    it('can delete directory', function ($key) {
+        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos->uploadData($key . '/test.txt', 'test');
+        $laravelCos->uploadData($key . '/test2.txt', 'test');
+        $laravelCos->deleteDirectory($key);
+        $this->assertFalse($laravelCos->directoryExists($key));
+    })->with($testDir);
 });

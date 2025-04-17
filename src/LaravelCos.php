@@ -3,16 +3,20 @@
 namespace Itinysun\LaravelCos;
 
 use Exception;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Itinysun\LaravelCos\Data\FileAttr;
+use Itinysun\LaravelCos\Data\FileCopyAttr;
 use Itinysun\LaravelCos\Data\ImageInfo;
 use Itinysun\LaravelCos\Data\ListData;
 use Itinysun\LaravelCos\Enums\ObjectAcl;
 use Itinysun\LaravelCos\Enums\StorageClass;
+use League\Flysystem\PathPrefixer;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
@@ -27,17 +31,18 @@ readonly class LaravelCos
 
     protected string $bucket;
 
+    protected PathPrefixer $prefixer;
+
     /**
      * @throws CosFilesystemException
      */
     public function __construct($configName = null)
     {
-
         try {
-            if (! $configName) {
+            if (!$configName) {
                 $config = config('cos.default');
             } else {
-                $config = config('cos.'.$configName);
+                $config = config('cos.' . $configName);
             }
             $this->client = new Client([
                 'region' => $config['region'],
@@ -47,120 +52,56 @@ readonly class LaravelCos
                     'secretKey' => $config['secret_key'],
                 ],
             ]);
-            $this->bucket = $config['bucket'].'-'.$config['app_id'];
+            $this->bucket = $config['bucket'] . '-' . $config['app_id'];
             $this->config = $config;
+            $this->prefixer = new PathPrefixer($config['prefix'] ?? '');
         } catch (Exception $e) {
             throw new CosFilesystemException('you have to set cos config in config/cos.php');
         }
     }
 
-    /**
-     * @throws CosFilesystemException
-     */
-    public function exists(string $path): bool
+    public function getClient(): Client
     {
-        try {
-            return $this->client->doesObjectExist($this->bucket, $path);
-        } catch (Exception $e) {
-            report($e);
-            throw new CosFilesystemException('Check file exists failed: '.$e->getMessage());
+        return $this->client;
+    }
+    public function getConfig(): array
+    {
+        return $this->config;
+    }
+    public function getBucket(): string
+    {
+        return $this->bucket;
+    }
+    public function getPrefixer(): PathPrefixer
+    {
+        return $this->prefixer;
+    }
+
+
+    public function directoryExists(string $path): bool
+    {
+        $prefixedPath = $this->prefixer->prefixDirectoryPath($path);
+        $attr = $this->getFileAttr($prefixedPath);
+        if ($attr && $attr->key == $prefixedPath) {
+            return true;
+        } else {
+            return false;
         }
     }
 
-    /**
-     * @throws Exception
-     */
-    public function delete(string $path): void
+    public function getFileAttr($key): ?FileAttr
     {
         try {
-            $this->client->deleteObject([
+            $result = $this->client->getObject([
                 'Bucket' => $this->bucket,
-                'Key' => $path,
-            ]);
-        } catch (ServiceResponseException $e) {
-            report($e);
-            throw new CosFilesystemException('Delete failed: '.$e->getMessage());
-        }
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function deleteDirectory(string $path): void
-    {
-        try {
-            $files = $this->listObjects($path, true)?->getFiles();
-            // Delete all files in the directory
-            if ($files && ! $files->isEmpty()) {
-                $list = $files->map(function ($file) {
-                    return [
-                        'Key' => $file->key,
-                    ];
-                });
-                Log::warning('delete directory', ['path' => $path, 'sum' => $list->count()]);
-                $this->client->deleteObjects([
-                    'Bucket' => $this->bucket,
-                    'Objects' => $list,
-                ]);
-            }
-            // Delete the directory itself
-            $this->client->deleteObject([
-                'Bucket' => $this->bucket,
-                'Key' => Str::finish($path, '/'),
-            ]);
-        } catch (ServiceResponseException $e) {
-            report($e);
-            throw new CosFilesystemException('Delete directory failed: '.$e->getMessage());
-        }
-    }
-
-    public function listObjects(string $directory = '', bool $recursive = false): ?ListData
-    {
-        try {
-            $directory = Str::finish($directory, '/');
-            $result = $this->client->listObjects([
-                'Bucket' => $this->bucket,
-                'Delimiter' => $recursive ? '' : '/',
-                'MaxKeys' => 1000,
-                'Prefix' => $directory,
+                'Key' => $key,
             ]);
             $data = $result->toArray();
-        } catch (ServiceResponseException $e) {
+            Log::debug('getFileAttr', ['data' => $data]);
+            return FileAttr::from($data);
+        } catch (Exception $e) {
             report($e);
-
             return null;
-        }
-        if (! isset($data)) {
-            return null;
-        }
-        try {
-            $list = ListData::from($data);
-            if ($list->isTruncated) {
-                throw new Exception('List is truncated, please use pagination');
-            }
-
-            return $list;
-        } catch (\Exception $e) {
-            Log::error('Error when parsing listObjects response: '.$e->getMessage());
-            report($e);
-
-            return null;
-        }
-
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function uploadFile($key, $filePath): void
-    {
-        if (! file_exists($filePath)) {
-            throw new Exception("File not found: $filePath");
-        }
-        $handle = fopen($filePath, 'rb');
-        $this->client->upload($this->bucket, $key, $handle);
-        if (is_resource($handle)) {
-            @fclose($handle);
         }
     }
 
@@ -174,7 +115,97 @@ readonly class LaravelCos
             ]);
         } catch (Exception $e) {
             report($e);
-            throw new UnableToCreateDirectory('create directory failed: '.$e->getMessage());
+            throw new UnableToCreateDirectory('create directory failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @throws UnableToDeleteDirectory
+     */
+    public function deleteDirectory(string $path): void
+    {
+        try {
+            $files = $this->listObjects($path, true)?->getFiles();
+            // Delete all files in the directory
+            if ($files && !$files->isEmpty()) {
+                $list = $files->map(function ($file) {
+                    return [
+                        'Key' => $file->key,
+                    ];
+                });
+                Log::warning('delete directory', ['path' => $path, 'sum' => $list->count(), 'list' => $list]);
+                $this->client->deleteObjects([
+                    'Bucket' => $this->bucket,
+                    'Objects' => $list->toArray(),
+                ]);
+            }
+            // Delete the directory itself
+            $this->client->deleteObject([
+                'Bucket' => $this->bucket,
+                'Key' => Str::finish($path, '/'),
+            ]);
+        } catch (Exception $e) {
+            report($e);
+            throw new UnableToDeleteDirectory('Delete directory failed: ' . $e->getMessage());
+        }
+    }
+
+    public function listObjects(string $directory = '', bool $recursive = false): ?ListData
+    {
+        $data = false;
+        try {
+            $prefixedPath = $this->prefixer->prefixDirectoryPath($directory);
+            $result = $this->client->listObjects([
+                'Bucket' => $this->bucket,
+                'Delimiter' => $recursive ? '' : '/',
+                'MaxKeys' => 1000,
+                'Prefix' => $prefixedPath,
+            ]);
+            $data = $result->toArray();
+        } catch (ServiceResponseException $e) {
+            report($e);
+            return null;
+        }
+        if (!$data && !is_array($data)) {
+            return null;
+        }
+        try {
+            $list = ListData::from($data);
+            if ($list->isTruncated) {
+                throw new CosFilesystemException('List is truncated, please use pagination');
+            }
+            return $list;
+        } catch (\Exception $e) {
+            Log::error('Error when parsing listObjects response: ' . $e->getMessage());
+            report($e);
+            return null;
+        }
+    }
+
+    public function exists(string $path): bool
+    {
+        $prefixedPath = $this->prefixer->prefixPath($path);
+        $attr = $this->getFileAttr($prefixedPath);
+        if ($attr && $attr->key == $prefixedPath) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function uploadFile($key, $filePath): void
+    {
+        $prefixedPath = $this->prefixer->prefixPath($key);
+        if (!file_exists($filePath)) {
+            throw new FileNotFoundException("File not found: $filePath");
+        }
+        $handle = fopen($filePath, 'rb');
+        $this->client->upload($this->bucket, $prefixedPath, $handle);
+        if (is_resource($handle)) {
+            @fclose($handle);
         }
     }
 
@@ -185,10 +216,11 @@ readonly class LaravelCos
      */
     public function uploadData(string $key, mixed $data, StorageClass $class = StorageClass::STANDARD, array $config = []): void
     {
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $opt = [
                 'Bucket' => $this->bucket,
-                'Key' => $key,
+                'Key' => $prefixedPath,
                 'Body' => $data,
             ];
             if ($class && $class != StorageClass::STANDARD) {
@@ -200,7 +232,7 @@ readonly class LaravelCos
             $this->client->putObject($opt);
         } catch (\Throwable $e) {
             report($e);
-            throw new UnableToWriteFile('Upload failed: '.$e->getMessage());
+            throw new UnableToWriteFile('Upload failed: ' . $e->getMessage());
         }
     }
 
@@ -209,29 +241,31 @@ readonly class LaravelCos
      */
     public function download($key, $target): void
     {
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
-            $this->client->download($this->bucket, $key, $target, [
+            $this->client->download($this->bucket, $prefixedPath, $target, [
                 'PartSize' => 20 * 1024 * 1024, // 分块大小
                 'Concurrency' => 1, // 并发数
             ]);
         } catch (\Throwable $e) {
             report($e);
-            throw new Exception('Download failed: '.$e->getMessage());
+            throw new Exception('Download failed: ' . $e->getMessage());
         }
     }
 
     public function getData($key)
     {
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $result = $this->client->getObject([
                 'Bucket' => $this->bucket,
-                'Key' => $key,
+                'Key' => $prefixedPath,
             ]);
 
             return $result['Body'];
         } catch (Exception $e) {
             report($e);
-            throw UnableToReadFile::fromLocation($key, (string) $e);
+            throw UnableToReadFile::fromLocation($prefixedPath, (string)$e);
         }
     }
 
@@ -240,51 +274,66 @@ readonly class LaravelCos
      */
     public function picInfo($key): ImageInfo
     {
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $result = $this->client->ImageInfo([
                 'Bucket' => $this->bucket,
-                'Key' => $key,
+                'Key' => $prefixedPath,
             ]);
 
             return ImageInfo::from($result['Data']);
         } catch (Exception $e) {
             report($e);
-            throw new Exception('Get pic info failed: '.$e->getMessage());
+            throw new Exception('Get pic info failed: ' . $e->getMessage());
         }
     }
 
-
-    public function move($from, $to): void
+    public function move($from, $to, ?FileCopyAttr $attr = null): void
     {
+
         try {
             $this->copy($from, $to);
             $this->delete($from);
         } catch (Exception $e) {
-            throw new UnableToMoveFile('Move failed: '.$e->getMessage());
+            throw new UnableToMoveFile('Move failed: ' . $e->getMessage());
         }
     }
 
-    public function copy($from, $to): void
+    public function copy($from, $to, ?FileCopyAttr $attr = null): void
     {
+        $prefixedFrom = $this->prefixer->prefixPath($from);
+        $prefixedTo = $this->prefixer->prefixPath($to);
         try {
-            $this->client->copy($this->bucket, $to, [
+            $data = [
                 'Region' => $this->config['region'],
                 'Bucket' => $this->bucket,
-                'Key' => $from,
-            ]);
+                'Key' => $prefixedFrom,
+            ];
+            if ($attr) {
+                $data = array_merge($data, $attr->toArray());
+            }
+            $this->client->copy($this->bucket, $prefixedTo, $data);
         } catch (Exception $e) {
             report($e);
-            throw new UnableToCopyFile('Copy failed: '.$e->getMessage());
+            throw new UnableToCopyFile('Copy failed: ' . $e->getMessage());
         }
     }
 
-    protected function buildFullPath(string $key, ?string $version = null): string
+    /**
+     * @throws Exception
+     */
+    public function delete(string $path): void
     {
-        $full = "{$this->bucket}.cos.{$this->config['region']}.myqcloud.com/{$key}";
-        if ($version) {
-            $full .= '?versionId='.$version;
+        $prefixedPath = $this->prefixer->prefixPath($path);
+        try {
+            $this->client->deleteObject([
+                'Bucket' => $this->bucket,
+                'Key' => $prefixedPath,
+            ]);
+        } catch (ServiceResponseException $e) {
+            report($e);
+            throw new CosFilesystemException('Delete failed: ' . $e->getMessage());
         }
-        return $full;
     }
 
     /**
@@ -292,15 +341,16 @@ readonly class LaravelCos
      */
     public function setFileAcl(string $key, ObjectAcl $acl): void
     {
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $this->client->putObjectAcl([
                 'Bucket' => $this->bucket,
-                'Key' => $key,
+                'Key' => $prefixedPath,
                 'ACL' => $acl->value,
             ]);
         } catch (Exception $e) {
             report($e);
-            throw new CosFilesystemException('setFileAcl failed: '.$e->getMessage());
+            throw new CosFilesystemException('setFileAcl failed: ' . $e->getMessage());
         }
     }
 
@@ -309,15 +359,15 @@ readonly class LaravelCos
      */
     public function getFileAcl(string $key): ObjectAcl
     {
-
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $result = $this->client->getObjectAcl([
                 'Bucket' => $this->bucket,
-                'Key' => $key,
+                'Key' => $prefixedPath,
             ]);
             $grants = Arr::get($result->toArray(), 'Grants', []);
         } catch (Exception $e) {
-            throw new CosFilesystemException('getFileAcl failed: '.$e->getMessage());
+            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
         }
         if (empty($grants)) {
             throw new CosFilesystemException('getFileAcl failed,no grants found');
@@ -338,7 +388,7 @@ readonly class LaravelCos
             // Default to private if no public permission found
             return ObjectAcl::PRIVATE;
         } catch (Exception $e) {
-            throw new CosFilesystemException('getFileAcl failed: '.$e->getMessage());
+            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
         }
     }
 
@@ -347,9 +397,10 @@ readonly class LaravelCos
      */
     public function setFileAttr($key, FileAttr $attr): void
     {
+        $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $data = [
-                'key' => $key,
+                'key' => $prefixedPath,
                 'bucket' => $this->bucket,
                 'copy_source' => $this->buildFullPath($key),
             ];
@@ -357,35 +408,28 @@ readonly class LaravelCos
             $this->client->copyObject(array_merge($options, $data));
         } catch (Exception $e) {
             report($e);
-            throw new CosFilesystemException('setFileAttr failed: '.$e->getMessage());
+            throw new CosFilesystemException('setFileAttr failed: ' . $e->getMessage());
         }
     }
 
-    /**
-     * @throws CosFilesystemException
-     */
-    public function getFileAttr($key): FileAttr
+    protected function buildFullPath(string $key, ?string $version = null): string
     {
-        try {
-            $result = $this->client->getObject([
-                'Bucket' => $this->bucket,
-                'Key' => $key,
-            ]);
-            $data = $result->toArray();
-            return FileAttr::from($data);
-        } catch (Exception $e) {
-            report($e);
-            throw new CosFilesystemException("getFileAttr failed: key {$key} ,error: {$e->getMessage()}");
+        $full = "{$this->bucket}.cos.{$this->config['region']}.myqcloud.com/{$key}";
+        if ($version) {
+            $full .= '?versionId=' . $version;
         }
+        return $full;
     }
 
     public function fixedUrl(string $key)
     {
-        return $this->client->getObjectUrlWithoutSign($this->bucket, $key);
+        $prefixedPath = $this->prefixer->prefixPath($key);
+        return $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath);
     }
 
     public function tempUrl(string $key, int $minutes = 10): string
     {
-        return $this->client->getObjectUrl($this->bucket, $key, "+{{$minutes}} minutes");
+        $prefixedPath = $this->prefixer->prefixPath($key);
+        return $this->client->getObjectUrl($this->bucket, $prefixedPath, "+{{$minutes}} minutes");
     }
 }

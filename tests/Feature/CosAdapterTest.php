@@ -5,7 +5,10 @@ beforeEach(function () {
 
 describe('test flysystem adapter', function () {
     $testFile = [
-        'key' => 'test/test1.txt',
+        'test/test1.txt',
+    ];
+    $testDir = [
+        'test/test2',
     ];
     it('can write file', function ($key) {
         \Illuminate\Support\Facades\Storage::disk('cos')->put($key, 'test');
@@ -16,6 +19,7 @@ describe('test flysystem adapter', function () {
         $this->assertEquals($data, 'test');
     })->with($testFile);
     it('can delete file', function ($key) {
+        \Illuminate\Support\Facades\Storage::disk('cos')->put($key, 'test');
         \Illuminate\Support\Facades\Storage::disk('cos')->delete($key);
         $this->assertFalse(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
     })->with($testFile);
@@ -36,10 +40,10 @@ describe('test flysystem adapter', function () {
         $this->assertEquals($data, 'test');
     })->with($testFile);
 
-    it('can create directory', function ($key) {
-        \Illuminate\Support\Facades\Storage::disk('cos')->makeDirectory($key);
-        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('cos')->directoryExists($key));
-    })->with($testFile);
+    it('can create directory', function ($dir) {
+        \Illuminate\Support\Facades\Storage::disk('cos')->makeDirectory($dir);
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('cos')->directoryExists($dir));
+    })->with($testDir);
 
     it('can delete directory', function ($key) {
         \Illuminate\Support\Facades\Storage::disk('cos')->deleteDirectory($key);
