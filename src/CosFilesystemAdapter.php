@@ -25,7 +25,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     /**
      * @throws \Exception
      */
-    public function __construct(array $config=[])
+    public function __construct(array $config = [])
     {
         $this->cos = new LaravelCos($config['config_name'] ?? 'default');
         $this->prefixer = new PathPrefixer($config['prefix'] ?? '');
@@ -42,7 +42,13 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         $prefixedPath = $this->prefixer->prefixPath($path);
 
-        return $this->cos->exists($prefixedPath);
+        $attr = $this->cos->getFileAttr($prefixedPath);
+        if($attr->key){
+            return true;
+        }else
+        {
+            return false;
+        }
     }
 
     public function writeStream(string $path, $contents, Config $config): void
@@ -83,7 +89,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
             $prefixedPath = $this->prefixer->prefixPath($path);
             return $this->cos->getData($prefixedPath);
         } catch (\Exception $e) {
-            throw new UnableToReadFile($path,$e->getCode(), $e);
+            throw new UnableToReadFile($path, $e->getCode(), $e);
         }
     }
 
@@ -119,7 +125,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
             $prefixedPath = $this->prefixer->prefixPath($path);
             $this->cos->setFileAcl($prefixedPath, ObjectAcl::fromVisibility($visibility));
         } catch (\Exception $e) {
-            throw new CosFilesystemException('Set visibility failed: '.$e->getMessage());
+            throw new CosFilesystemException('Set visibility failed: ' . $e->getMessage());
         }
     }
 
@@ -128,10 +134,11 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
         $prefixedPath = $this->prefixer->prefixPath($path);
         try {
             $acl = $this->cos->getFileAcl($prefixedPath);
-            if($acl === ObjectAcl::PUBLIC_READ) {
-                return new FileAttributes($path, null,Visibility::PUBLIC);
-            } {
-                return new FileAttributes($path, null,Visibility::PRIVATE);
+            if ($acl === ObjectAcl::PUBLIC_READ) {
+                return new FileAttributes($path, null, Visibility::PUBLIC);
+            }
+            {
+                return new FileAttributes($path, null, Visibility::PRIVATE);
             }
         } catch (\Exception $e) {
             throw new CosFilesystemException('Get visibility failed: ' . $e->getMessage());
@@ -143,10 +150,10 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
         $prefixedPath = $this->prefixer->prefixPath($path);
         try {
             $attr = $this->cos->getFileAttr($prefixedPath);
-            if ($attr->contentType === null) {
+            if ($attr->contentType == null) {
                 throw new UnableToRetrieveMetadata('Get mime type failed: ' . $path);
             }
-return $attr->toFileAttributes();
+            return $attr->toFileAttributes();
         } catch (\Exception $e) {
             throw new CosFilesystemException('Get mime type failed: ' . $e->getMessage());
         }
@@ -157,7 +164,7 @@ return $attr->toFileAttributes();
         $prefixedPath = $this->prefixer->prefixPath($path);
         try {
             $attr = $this->cos->getFileAttr($prefixedPath);
-            if ($attr->lastModified === null) {
+            if ($attr->lastModified == null) {
                 throw new UnableToRetrieveMetadata('Get last modified failed: ' . $path);
             }
             return $attr->toFileAttributes();
@@ -171,10 +178,10 @@ return $attr->toFileAttributes();
         $prefixedPath = $this->prefixer->prefixPath($path);
         try {
             $attr = $this->cos->getFileAttr($prefixedPath);
-            if ($attr->contentLength === null) {
+            if ($attr->contentLength == null) {
                 throw new UnableToRetrieveMetadata('Get file size failed: ' . $path);
             }
-return $attr->toFileAttributes();
+            return $attr->toFileAttributes();
         } catch (\Exception $e) {
             throw new CosFilesystemException('Get file size failed: ' . $e->getMessage());
         }
@@ -186,7 +193,7 @@ return $attr->toFileAttributes();
         try {
             $contents = $this->cos->listObjects($prefixedPath, $deep);
             foreach ($contents->getFiles() as $content) {
-                yield new FileAttributes($content->key,$content->size,null,$content->lastModified);
+                yield new FileAttributes($content->key, $content->size, null, $content->lastModified->timestamp);
             }
             foreach ($contents->getDirs() as $content) {
                 yield new FileAttributes($content->key, null, null, null, true);
@@ -198,7 +205,7 @@ return $attr->toFileAttributes();
 
     public function move(string $source, string $destination, Config $config): void
     {
-        // TODO: Implement move() method.
+        $this->cos->move($source, $destination);
     }
 
     public function copy(string $source, string $destination, Config $config): void

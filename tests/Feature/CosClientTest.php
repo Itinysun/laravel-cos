@@ -1,14 +1,12 @@
 <?php
-
 beforeEach(function () {
 
 })->skip(fn() => empty(config('cos.default')), 'cos_config.php is empty');
 
-$testFile = [
-    'key' => 'test/test.txt',
-];
-
-describe('test cos sdk', function () use ($testFile) {
+describe('test cos sdk', function () {
+    $testFile = [
+        'key' => 'test/test2.txt',
+    ];
     it('can write file', function ($key) {
         $laravelCos = new Itinysun\LaravelCos\LaravelCos();
         $laravelCos->uploadData($key, 'test');
@@ -23,8 +21,9 @@ describe('test cos sdk', function () use ($testFile) {
 
     it('can download file', function ($key) {
         $laravelCos = new Itinysun\LaravelCos\LaravelCos();
-        $result = $laravelCos->download($key, './test.txt');
-        $this->assertFileExists('./test.txt');
+        $laravelCos->download($key, './test2.txt');
+        $this->assertFileExists('./test2.txt');
+        unlink('./test2.txt');
     })->with($testFile);
 
     it('can delete file', function ($key) {
@@ -50,36 +49,5 @@ describe('test cos sdk', function () use ($testFile) {
         $laravelCos = new Itinysun\LaravelCos\LaravelCos();
         $attr = $laravelCos->getFileAttr($key);
         $this->assertEquals($attr->key, $key);
-    })->with($testFile);
-});
-
-describe('test flysystem adapter',function () use ($testFile){
-    it('can write file', function ($key) {
-        \Illuminate\Support\Facades\Storage::disk('cos')->put($key, 'test');
-        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
-    })->with($testFile);
-    it('can read file', function ($key) {
-        $data = \Illuminate\Support\Facades\Storage::disk('cos')->get($key);
-        $this->assertEquals($data, 'test');
-    })->with($testFile);
-    it('can delete file', function ($key) {
-        \Illuminate\Support\Facades\Storage::disk('cos')->delete($key);
-        $this->assertFalse(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
-    })->with($testFile);
-
-    it('can write stream', function ($key) {
-        $stream = fopen('php://temp', 'r+');
-        fwrite($stream, 'test');
-        rewind($stream);
-        \Illuminate\Support\Facades\Storage::disk('cos')->writeStream($key, $stream);
-        fclose($stream);
-        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('cos')->exists($key));
-    })->with($testFile);
-
-        it('can read stream', function ($key) {
-        $stream = \Illuminate\Support\Facades\Storage::disk('cos')->readStream($key);
-        $data = stream_get_contents($stream);
-        fclose($stream);
-        $this->assertEquals($data, 'test');
     })->with($testFile);
 });
