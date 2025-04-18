@@ -1,0 +1,24 @@
+laravel: '@testbench'
+
+providers:
+  - Workbench\App\Providers\WorkbenchServiceProvider
+  - Itinysun\LaravelCos\LaravelCosServiceProvider
+workbench:
+  install: false
+  health: false
+  discovers:
+    web: false
+    api: false
+    commands: true
+    components: false
+    factories: false
+    views: false
+  build:
+    - asset-publish
+  assets:
+    - cos-config
+    - data-config
+  sync:
+    - from: storage
+      to: workbench/storage
+      reverse: true

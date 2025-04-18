@@ -8,9 +8,11 @@ use Itinysun\LaravelCos\LaravelCosServiceProvider;
 use Itinysun\LaravelCos\Lib\CosFilesystemAdapter;
 use League\Flysystem\Filesystem;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Orchestra\Testbench\Concerns\WithWorkbench;
 
 class TestCase extends Orchestra
 {
+    use WithWorkbench;
     private string $configFile = 'test_config.php';
     private string $logFile = 'test.log';
 
@@ -35,23 +37,6 @@ class TestCase extends Orchestra
             config()->set('filesystems.disks.cos', $config);
         }
 
-        //use spatie/laravel-data
-        $data = require './vendor/spatie/laravel-data/config/data.php';
-        config()->set('data', $data);
-
-        //enable the filesystem
-        Storage::extend('cos', function ($app, $config) {
-            $adapter = new CosFilesystemAdapter($config);
-            return new FilesystemAdapter(new Filesystem($adapter,[],null,$adapter,$adapter), $adapter);
-        });
-
-        //enable logging
-        config()->set('logging.default', 'single');
-        config()->set('logging.channels.single', [
-            'driver' => 'single',
-            'path' => 'test.log',
-            'level' => 'debug',
-        ]);
     }
 
     protected function setUp(): void
@@ -64,5 +49,10 @@ class TestCase extends Orchestra
         return [
             LaravelCosServiceProvider::class,
         ];
+    }
+
+    protected function getApplicationTimezone($app)
+    {
+        return 'Asia/Shanghai';
     }
 }
