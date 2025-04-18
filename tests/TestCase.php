@@ -4,17 +4,17 @@ namespace Itinysun\LaravelCos\Tests;
 
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
-use Itinysun\LaravelCos\CosFilesystemAdapter;
 use Itinysun\LaravelCos\LaravelCosServiceProvider;
+use Itinysun\LaravelCos\Lib\CosFilesystemAdapter;
 use League\Flysystem\Filesystem;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {
-    private $configFile = 'test_config.php';
-    private $logFile = 'test.log';
+    private string $configFile = 'test_config.php';
+    private string $logFile = 'test.log';
 
-    public function getEnvironmentSetUp($app)
+    public function getEnvironmentSetUp($app): void
     {
         if (!file_exists($this->configFile)) {
             file_put_contents($this->configFile, '<?php return [];');
@@ -42,7 +42,7 @@ class TestCase extends Orchestra
         //enable the filesystem
         Storage::extend('cos', function ($app, $config) {
             $adapter = new CosFilesystemAdapter($config);
-            return new FilesystemAdapter(new Filesystem($adapter), $adapter);
+            return new FilesystemAdapter(new Filesystem($adapter,[],null,$adapter,$adapter), $adapter);
         });
 
         //enable logging

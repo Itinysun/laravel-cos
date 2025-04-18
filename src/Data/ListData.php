@@ -40,9 +40,9 @@ class ListData extends Data
             return $this->contents->filter(function ($item) {
                 return ! Str::endsWith($item->key, '/');
             });
-        } else {
-            return collect();
         }
+
+        return collect();
     }
 
     /**
@@ -56,16 +56,16 @@ class ListData extends Data
             return collect($this->commonPrefixes)->map(function ($item) {
                 return $item['Prefix'];
             });
-        } else {
-            if (! $this->contents) {
-                return collect();
-            }
-
-            return collect($this->contents)->map(function ($item) {
-                return $item->key;
-            })->filter(function ($item) {
-                return Str::endsWith($item, '/');
-            });
         }
+
+        if (! $this->contents) {
+            return collect();
+        }
+
+        return collect($this->contents)->map(function ($item) {
+            return $item->key;
+        })->filter(function ($item) {
+            return Str::endsWith($item, '/');
+        });
     }
 }

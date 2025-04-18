@@ -11,7 +11,7 @@ describe('test cos sdk', function () {
         'test/test2',
     ];
     it('can read and write file', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $data = $laravelCos->getData($key);
@@ -20,7 +20,7 @@ describe('test cos sdk', function () {
 
 
     it('can download file', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
                 $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $laravelCos->download($key, './test2.txt');
@@ -29,33 +29,33 @@ describe('test cos sdk', function () {
     })->with($testFile);
 
     it('can delete file', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $laravelCos->uploadData($key, 'test');
         $laravelCos->delete($key);
         $this->assertFalse($laravelCos->exists($key));
     })->with($testFile);
 
     it('can upload file', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $laravelCos->uploadFile($key, './test.txt');
         $this->assertTrue($laravelCos->exists($key));
     })->with($testFile);
 
 
     it('get acl success', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $acl = $laravelCos->getFileAcl($key);
         $this->assertEquals($acl, \Itinysun\LaravelCos\Enums\ObjectAcl::PRIVATE);
     })->with($testFile);
 
     it('get attr success', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $attr = $laravelCos->getFileAttr($key);
         $this->assertEquals($attr->key, $key);
     })->with($testFile);
 
     it('can delete directory', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $laravelCos->uploadData($key . '/test.txt', 'test');
         $laravelCos->uploadData($key . '/test2.txt', 'test');
         $laravelCos->deleteDirectory($key);
@@ -63,14 +63,14 @@ describe('test cos sdk', function () {
     })->with($testDir);
 
     it('can set file acl', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $laravelCos->setFileAcl($key, \Itinysun\LaravelCos\Enums\ObjectAcl::PUBLIC_READ);
         $acl = $laravelCos->getFileAcl($key);
         $this->assertEquals($acl, \Itinysun\LaravelCos\Enums\ObjectAcl::PUBLIC_READ);
     })->with($testFile);
 
     it('can set file attr', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
 
         $laravelCos->uploadData($key, 'test');
 
@@ -92,7 +92,7 @@ describe('test cos sdk', function () {
     })->with($testFile);
 
     it('can copy file', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $newKey = 'test/test3.txt';
@@ -103,7 +103,7 @@ describe('test cos sdk', function () {
     })->with($testFile);
 
     it('can move file', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $newKey = 'test/test3.txt';
@@ -113,7 +113,7 @@ describe('test cos sdk', function () {
     })->with($testFile);
 
     it('can get temp url', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $url = $laravelCos->tempUrl($key, \Illuminate\Support\Carbon::now()->minutes(30),['foo'=>'bar']);
@@ -121,7 +121,7 @@ describe('test cos sdk', function () {
         $this->assertTrue($hasParam);
     })->with($testFile);
     it('can get fixed url', function ($key) {
-        $laravelCos = new Itinysun\LaravelCos\LaravelCos();
+        $laravelCos = new \Itinysun\LaravelCos\Lib\LaravelCos();
         $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $url = $laravelCos->fixedUrl($key, ['foo'=>'bar']);

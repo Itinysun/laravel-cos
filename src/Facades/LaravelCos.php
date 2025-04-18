@@ -6,13 +6,13 @@ use Exception;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \Itinysun\LaravelCos\LaravelCos
+ * @see \Itinysun\LaravelCos\Lib\LaravelCos
  */
 class LaravelCos extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Itinysun\LaravelCos\LaravelCos::class;
+        return \Itinysun\LaravelCos\Lib\LaravelCos::class;
     }
 
     /**
@@ -20,7 +20,7 @@ class LaravelCos extends Facade
      */
     public static function registerInstance($configName): void
     {
-        $instance = new \Itinysun\LaravelCos\LaravelCos($configName);
-        app()->instance(\Itinysun\LaravelCos\LaravelCos::class, $instance);
+        $instance = new \Itinysun\LaravelCos\Lib\LaravelCos($configName);
+        app()->instance(\Itinysun\LaravelCos\Lib\LaravelCos::class, $instance);
     }
 }

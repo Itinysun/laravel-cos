@@ -5,6 +5,7 @@ namespace Itinysun\LaravelCos;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
+use Itinysun\LaravelCos\Lib\CosFilesystemAdapter;
 use League\Flysystem\Filesystem;
 
 class CosStorageServiceProvider extends ServiceProvider

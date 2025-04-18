@@ -2,7 +2,7 @@
 
 namespace Itinysun\LaravelCos\Enums;
 
-use Itinysun\LaravelCos\CosFilesystemException;
+use Itinysun\LaravelCos\Exceptions\CosFilesystemException;
 
 enum BucketAcl: string
 {

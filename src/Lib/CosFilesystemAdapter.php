@@ -1,11 +1,13 @@
 <?php
 
-namespace Itinysun\LaravelCos;
+namespace Itinysun\LaravelCos\Lib;
 
 use DateTimeInterface;
+use Exception;
 use Illuminate\Support\Carbon;
 use Itinysun\LaravelCos\Data\FileCopyAttr;
 use Itinysun\LaravelCos\Enums\ObjectAcl;
+use Itinysun\LaravelCos\Exceptions\CosFilesystemException;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
@@ -14,15 +16,17 @@ use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToWriteFile;
+use League\Flysystem\UrlGeneration\PublicUrlGenerator;
 use League\Flysystem\UrlGeneration\TemporaryUrlGenerator;
 use League\Flysystem\Visibility;
+use function stream_get_contents;
 
-class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
+class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,PublicUrlGenerator
 {
     protected LaravelCos $cos;
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     public function __construct(array $config = [])
     {
@@ -41,7 +45,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 
     public function writeStream(string $path, $contents, Config $config): void
     {
-        $this->write($path, \stream_get_contents($contents), $config);
+        $this->write($path, stream_get_contents($contents), $config);
     }
 
     public function write(string $path, string $contents, Config $config): void
@@ -58,14 +62,14 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
         $contents = $this->read($path);
         try {
             // 使用 fopen 打开一个内存资源，以读写模式（'r+'）打开
-            $stream = fopen('php://memory', 'r+');
+            $stream = fopen('php://memory', 'rb+');
             // 将字符串写入到流中
             fwrite($stream, $contents);
             // 将文件指针重置到流的开头，以便可以从头开始读取
             rewind($stream);
 
             return $stream;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new CosFilesystemException($path, $e);
         }
     }
@@ -74,7 +78,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         try {
             return $this->cos->getData($path);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new UnableToReadFile($path, $e->getCode(), $e);
         }
     }
@@ -83,7 +87,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         try {
             $this->cos->delete($path);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new UnableToDeleteFile($path, $e);
         }
     }
@@ -92,7 +96,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         try {
             $this->cos->deleteDirectory($path);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new UnableToDeleteDirectory($path, $e);
         }
     }
@@ -106,7 +110,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         try {
             $this->cos->setFileAcl($path, ObjectAcl::fromVisibility($visibility));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new CosFilesystemException('Set visibility failed: ' . $e->getMessage());
         }
     }
@@ -123,7 +127,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
             {
                 return new FileAttributes($prefixedPath, null, Visibility::PRIVATE);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new CosFilesystemException('Get visibility failed: ' . $e->getMessage());
         }
     }
@@ -131,7 +135,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     public function mimeType(string $path): FileAttributes
     {
         $attr = $this->cos->getFileAttr($path);
-        if ($attr->contentType == null) {
+        if ($attr === null || empty($attr->contentType)) {
             throw new UnableToRetrieveMetadata('Get mime type failed: ' . $path);
         }
         return $attr->toFileAttributes();
@@ -143,19 +147,19 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
         $attr = $this->cos->getFileAttr($path);
         if ($attr && $attr->lastModified != null) {
             return $attr->toFileAttributes();
-        } else {
-            throw new UnableToRetrieveMetadata('Get last modified failed: ' . $path);
         }
+
+        throw new UnableToRetrieveMetadata('Get last modified failed: ' . $path);
     }
 
     public function fileSize(string $path): FileAttributes
     {
         $attr = $this->cos->getFileAttr($path);
-        if ($attr && $attr->contentLength != null) {
+        if ($attr && $attr->contentLength > 0) {
             return $attr->toFileAttributes();
-        } else {
-            throw new UnableToRetrieveMetadata('Get file size failed: ' . $path);
         }
+
+        throw new UnableToRetrieveMetadata('Get file size failed: ' . $path);
 
     }
 
@@ -163,25 +167,29 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
     {
         try {
             $contents = $this->cos->listObjects($path, $deep);
+            if($contents===null)
+            {
+                return [];
+            }
             foreach ($contents->getFiles() as $content) {
                 yield new FileAttributes($content->key, $content->size, null, $content->lastModified->timestamp);
             }
             foreach ($contents->getDirs() as $content) {
                 yield new FileAttributes($content->key, null, null, null, true);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new CosFilesystemException('List contents failed: ' . $e->getMessage());
         }
     }
 
     public function move(string $source, string $destination, Config $config): void
     {
-        $this->cos->move($source, $destination,FileCopyAttr::from($config->toArray()));
+        $this->cos->move($source, $destination, FileCopyAttr::from($config->toArray()));
     }
 
     public function copy(string $source, string $destination, Config $config): void
     {
-        $this->cos->copy($source, $destination,FileCopyAttr::from($config->toArray()));
+        $this->cos->copy($source, $destination, FileCopyAttr::from($config->toArray()));
     }
 
     public function temporaryUrl(string $path, DateTimeInterface $expiresAt, Config $config): string
@@ -189,8 +197,18 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
         return $this->cos->tempUrl($path, Carbon::instance($expiresAt), $config->toArray());
     }
 
-    public function getSignedUrl(string $path, int|string $expires = '+60 minutes'): string
+    public function getTemporaryUrl(string $path, DateTimeInterface $expiresAt, array $config): string
     {
-        return $this->temporaryUrl($path, Carbon::parse($expires), new Config());
+        return $this->temporaryUrl($path, $expiresAt,new Config($config));
+    }
+
+    public function publicUrl(string $path, Config $config): string
+    {
+        return $this->cos->fixedUrl($path, $config->toArray());
+    }
+
+    public function getUrl(string $path): string
+    {
+        return $this->publicUrl($path, new Config());
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Itinysun\LaravelCos;
+namespace Itinysun\LaravelCos\Lib;
 
 use Carbon\Carbon;
 use Exception;
@@ -14,6 +14,7 @@ use Itinysun\LaravelCos\Data\ImageInfo;
 use Itinysun\LaravelCos\Data\ListData;
 use Itinysun\LaravelCos\Enums\ObjectAcl;
 use Itinysun\LaravelCos\Enums\StorageClass;
+use Itinysun\LaravelCos\Exceptions\CosFilesystemException;
 use League\Flysystem\PathPrefixer;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
@@ -24,6 +25,8 @@ use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
 use Qcloud\Cos\Client;
 use Qcloud\Cos\Exception\ServiceResponseException;
+use RuntimeException;
+use Throwable;
 
 readonly class LaravelCos
 {
@@ -46,6 +49,9 @@ readonly class LaravelCos
             } else {
                 $config = config('cos.' . $configName);
             }
+            if (empty($config)) {
+                throw new RuntimeException('you have to set cos config in config/cos.php');
+            }
             $this->client = new Client([
                 'region' => $config['region'],
                 'schema' => $config['use_https'] ? 'https' : 'http',
@@ -58,7 +64,7 @@ readonly class LaravelCos
             $this->config = $config;
             $this->prefixer = new PathPrefixer($config['prefix'] ?? '');
         } catch (Exception $e) {
-            throw new CosFilesystemException('you have to set cos config in config/cos.php');
+            throw new CosFilesystemException('can not create cos client: ' . $e->getMessage());
         }
     }
 
@@ -66,30 +72,22 @@ readonly class LaravelCos
     {
         return $this->client;
     }
+
     public function getConfig(): array
     {
         return $this->config;
     }
+
     public function getBucket(): string
     {
         return $this->bucket;
     }
+
     public function getPrefixer(): PathPrefixer
     {
         return $this->prefixer;
     }
 
-
-    public function directoryExists(string $path): bool
-    {
-        $prefixedPath = $this->prefixer->prefixDirectoryPath($path);
-        $attr = $this->getFileAttr($prefixedPath);
-        if ($attr && $attr->key == $prefixedPath) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
     public function getFileAttr($key): ?FileAttr
     {
@@ -105,6 +103,13 @@ readonly class LaravelCos
             report($e);
             return null;
         }
+    }
+
+    public function directoryExists(string $path): bool
+    {
+        $prefixedPath = $this->prefixer->prefixDirectoryPath($path);
+        $attr = $this->getFileAttr($prefixedPath);
+        return $attr && $attr->key === $prefixedPath;
     }
 
     public function createDirectory(string $key): void
@@ -154,7 +159,6 @@ readonly class LaravelCos
 
     public function listObjects(string $directory = '', bool $recursive = false): ?ListData
     {
-        $data = false;
         try {
             $prefixedPath = $this->prefixer->prefixDirectoryPath($directory);
             $result = $this->client->listObjects([
@@ -177,7 +181,7 @@ readonly class LaravelCos
                 throw new CosFilesystemException('List is truncated, please use pagination');
             }
             return $list;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error when parsing listObjects response: ' . $e->getMessage());
             report($e);
             return null;
@@ -188,11 +192,7 @@ readonly class LaravelCos
     {
         $prefixedPath = $this->prefixer->prefixPath($path);
         $attr = $this->getFileAttr($prefixedPath);
-        if ($attr && $attr->key == $prefixedPath) {
-            return true;
-        } else {
-            return false;
-        }
+        return $attr && $attr->key === $prefixedPath;
     }
 
     /**
@@ -225,14 +225,14 @@ readonly class LaravelCos
                 'Key' => $prefixedPath,
                 'Body' => $data,
             ];
-            if ($class && $class != StorageClass::STANDARD) {
+            if ($class && $class !== StorageClass::STANDARD) {
                 $opt['StorageClass'] = $class->value;
             }
             if ($config) {
                 $opt = array_merge($opt, $config);
             }
             $this->client->putObject($opt);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
             throw new UnableToWriteFile('Upload failed: ' . $e->getMessage());
         }
@@ -249,9 +249,9 @@ readonly class LaravelCos
                 'PartSize' => 20 * 1024 * 1024, // 分块大小
                 'Concurrency' => 1, // 并发数
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
-            throw new Exception('Download failed: ' . $e->getMessage());
+            throw new UnableToReadFile('Download failed: ' . $e->getMessage());
         }
     }
 
@@ -286,7 +286,7 @@ readonly class LaravelCos
             return ImageInfo::from($result['Data']);
         } catch (Exception $e) {
             report($e);
-            throw new Exception('Get pic info failed: ' . $e->getMessage());
+            throw new RuntimeException('Get pic info failed: ' . $e->getMessage());
         }
     }
 
@@ -294,7 +294,7 @@ readonly class LaravelCos
     {
 
         try {
-            $this->copy($from, $to);
+            $this->copy($from, $to, $attr);
             $this->delete($from);
         } catch (Exception $e) {
             throw new UnableToMoveFile('Move failed: ' . $e->getMessage());
@@ -315,9 +315,9 @@ readonly class LaravelCos
                 $data = array_merge($data, $attr->toArray());
                 //if we have metadata,original file's metadata will be replaced
                 //if we don't have metadata,original file's metadata will be copied
-                if(!empty($attr->metadata)) {
+                if (!empty($attr->metadata)) {
                     $data['MetadataDirective'] = 'REPLACE';
-                }else{
+                } else {
                     $data['MetadataDirective'] = 'COPY';
                 }
             }
@@ -425,7 +425,7 @@ readonly class LaravelCos
 
     protected function buildFullPath(string $key, ?string $version = null): string
     {
-        $full = "{$this->bucket}.cos.{$this->config['region']}.myqcloud.com/{$key}";
+        $full = "$this->bucket.cos.{$this->config['region']}.myqcloud.com/$key";
         if ($version) {
             $full .= '?versionId=' . $version;
         }
@@ -433,18 +433,19 @@ readonly class LaravelCos
     }
 
 
-    public function fixedUrl(string $key,array $params=[],array $headers=[]): string
+    public function fixedUrl(string $key, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        $url = $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params'=>$params,'Headers'=>$headers]);
+        $url = $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params' => $params, 'Headers' => $headers]);
         Log::debug('fixUrl', ['url' => $url]);
         return $url;
     }
 
-    public function tempUrl(string $key, ?Carbon $expireAt,array $params=[],array $headers=[]): string
+    public function tempUrl(string $key, ?Carbon $expireAt, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        $url = $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(),['Params'=>$params,'Headers'=>$headers]);
+        $expireAt = $expireAt ?? Carbon::now()->addMinutes(30);
+        $url = $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(), ['Params' => $params, 'Headers' => $headers]);
         Log::debug('tempUrl', ['url' => $url]);
         return $url;
     }

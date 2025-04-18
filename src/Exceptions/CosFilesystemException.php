@@ -1,6 +1,6 @@
 <?php
 
-namespace Itinysun\LaravelCos;
+namespace Itinysun\LaravelCos\Exceptions;
 
 use League\Flysystem\FilesystemException;
 
