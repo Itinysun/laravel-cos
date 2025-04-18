@@ -2,6 +2,7 @@
 
 namespace Itinysun\LaravelCos;
 
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Arr;
@@ -17,6 +18,7 @@ use League\Flysystem\PathPrefixer;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToDeleteDirectory;
+use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
@@ -311,6 +313,13 @@ readonly class LaravelCos
             ];
             if ($attr) {
                 $data = array_merge($data, $attr->toArray());
+                //if we have metadata,original file's metadata will be replaced
+                //if we don't have metadata,original file's metadata will be copied
+                if(!empty($attr->metadata)) {
+                    $data['MetadataDirective'] = 'REPLACE';
+                }else{
+                    $data['MetadataDirective'] = 'COPY';
+                }
             }
             $this->client->copy($this->bucket, $prefixedTo, $data);
         } catch (Exception $e) {
@@ -332,7 +341,7 @@ readonly class LaravelCos
             ]);
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new CosFilesystemException('Delete failed: ' . $e->getMessage());
+            throw new UnableToDeleteFile('Delete failed: ' . $e->getMessage());
         }
     }
 
@@ -395,16 +404,18 @@ readonly class LaravelCos
     /**
      * @throws CosFilesystemException
      */
-    public function setFileAttr($key, FileAttr $attr): void
+    public function setFileAttr($key, FileCopyAttr $attr): void
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $data = [
-                'key' => $prefixedPath,
-                'bucket' => $this->bucket,
-                'copy_source' => $this->buildFullPath($key),
+                'Key' => $prefixedPath,
+                'Bucket' => $this->bucket,
+                'CopySource' => $this->buildFullPath($key),
+                'MetadataDirective' => 'REPLACE',
             ];
             $options = $attr->toArray();
+            Log::debug('setFileAttr', ['data' => $data, 'options' => $options]);
             $this->client->copyObject(array_merge($options, $data));
         } catch (Exception $e) {
             report($e);
@@ -421,15 +432,20 @@ readonly class LaravelCos
         return $full;
     }
 
-    public function fixedUrl(string $key)
+
+    public function fixedUrl(string $key,array $params=[],array $headers=[]): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        return $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath);
+        $url = $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params'=>$params,'Headers'=>$headers]);
+        Log::debug('fixUrl', ['url' => $url]);
+        return $url;
     }
 
-    public function tempUrl(string $key, int $minutes = 10): string
+    public function tempUrl(string $key, ?Carbon $expireAt,array $params=[],array $headers=[]): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        return $this->client->getObjectUrl($this->bucket, $prefixedPath, "+{{$minutes}} minutes");
+        $url = $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(),['Params'=>$params,'Headers'=>$headers]);
+        Log::debug('tempUrl', ['url' => $url]);
+        return $url;
     }
 }

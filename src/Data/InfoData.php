@@ -6,9 +6,11 @@ use Carbon\Carbon;
 use Itinysun\LaravelCos\Enums\StorageClass;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\WithCast;
+use Spatie\LaravelData\Attributes\WithTransformer;
 use Spatie\LaravelData\Casts\DateTimeInterfaceCast;
 use Spatie\LaravelData\Casts\EnumCast;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Transformers\EnumTransformer;
 
 class InfoData extends Data
 {
@@ -24,6 +26,7 @@ class InfoData extends Data
         public string $eTag,
         #[MapInputName('StorageClass')]
         #[WithCast(EnumCast::class)]
+        #[WithTransformer(EnumTransformer::class)]
         public StorageClass $storageClass,
     ) {}
 }

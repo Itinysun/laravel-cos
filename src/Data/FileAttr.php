@@ -8,9 +8,11 @@ use League\Flysystem\FileAttributes;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Attributes\WithCast;
+use Spatie\LaravelData\Attributes\WithTransformer;
 use Spatie\LaravelData\Casts\DateTimeInterfaceCast;
 use Spatie\LaravelData\Casts\EnumCast;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Transformers\EnumTransformer;
 
 class FileAttr extends Data
 {
@@ -18,6 +20,7 @@ class FileAttr extends Data
     public string $key;
     #[mapName('StorageClass')]
     #[WithCast(EnumCast::class)]
+    #[WithTransformer(EnumTransformer::class)]
     public StorageClass $storageClass;
     #[MapInputName('LastModified')]
     #[WithCast(DateTimeInterfaceCast::class, format: 'D, d M Y H:i:s T')]

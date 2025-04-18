@@ -49,4 +49,9 @@ describe('test flysystem adapter', function () {
         \Illuminate\Support\Facades\Storage::disk('cos')->deleteDirectory($key);
         $this->assertFalse(\Illuminate\Support\Facades\Storage::disk('cos')->directoryExists($key));
     })->with($testFile);
+
+    it('can get temp url', function ($key) {
+        $url = \Illuminate\Support\Facades\Storage::disk('cos')->temporaryUrl($key, now()->addMinutes(5));
+        $this->assertStringContainsString('http', $url);
+    })->with($testFile);
 });

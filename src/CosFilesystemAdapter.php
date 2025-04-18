@@ -3,6 +3,8 @@
 namespace Itinysun\LaravelCos;
 
 use DateTimeInterface;
+use Illuminate\Support\Carbon;
+use Itinysun\LaravelCos\Data\FileCopyAttr;
 use Itinysun\LaravelCos\Enums\ObjectAcl;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
@@ -174,16 +176,21 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator
 
     public function move(string $source, string $destination, Config $config): void
     {
-        $this->cos->move($source, $destination);
+        $this->cos->move($source, $destination,FileCopyAttr::from($config->toArray()));
     }
 
     public function copy(string $source, string $destination, Config $config): void
     {
-        $this->cos->copy($source, $destination);
+        $this->cos->copy($source, $destination,FileCopyAttr::from($config->toArray()));
     }
 
     public function temporaryUrl(string $path, DateTimeInterface $expiresAt, Config $config): string
     {
-        return $this->cos->tempUrl($path, $expiresAt->getTimestamp(), $config->toArray());
+        return $this->cos->tempUrl($path, Carbon::instance($expiresAt), $config->toArray());
+    }
+
+    public function getSignedUrl(string $path, int|string $expires = '+60 minutes'): string
+    {
+        return $this->temporaryUrl($path, Carbon::parse($expires), new Config());
     }
 }

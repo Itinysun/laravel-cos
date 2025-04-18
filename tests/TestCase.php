@@ -16,6 +16,13 @@ class TestCase extends Orchestra
 
     public function getEnvironmentSetUp($app)
     {
+        if (!file_exists($this->configFile)) {
+            file_put_contents($this->configFile, '<?php return [];');
+        }
+        if (!file_exists($this->logFile)) {
+            file_put_contents($this->logFile, '');
+        }
+
         config()->set('database.default', 'testing');
 
         //load test config
@@ -50,12 +57,6 @@ class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
-        if (!file_exists($this->configFile)) {
-            file_put_contents($this->configFile, '<?php return [];');
-        }
-        if (!file_exists($this->logFile)) {
-            file_put_contents($this->logFile, '');
-        }
     }
 
     protected function getPackageProviders($app)
