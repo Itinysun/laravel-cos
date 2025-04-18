@@ -1,7 +1,6 @@
 laravel: '@testbench'
 
 providers:
-  - Workbench\App\Providers\WorkbenchServiceProvider
   - Itinysun\LaravelCos\LaravelCosServiceProvider
 workbench:
   install: false
