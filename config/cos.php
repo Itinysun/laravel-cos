@@ -23,10 +23,5 @@ return [
         'cdn' => '',
 
         'prefix' => '', // 全局路径前缀
-
-        'guzzle' => [
-            'timeout' => '60',
-            'connect_timeout' => '60',
-        ],
     ],
 ];

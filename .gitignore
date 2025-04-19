@@ -31,6 +31,9 @@ phpstan.neon
 /coverage
 
 # Test Files
+/logs
 /test_config.php
-/test.txt
-/test.log
+
+# Environment
+.env
+.log

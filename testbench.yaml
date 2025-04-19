@@ -17,7 +17,3 @@ workbench:
   assets:
     - cos-config
     - data-config
-  sync:
-    - from: storage
-      to: workbench/storage
-      reverse: true

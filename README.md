@@ -5,28 +5,19 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/itinysun/laravel-cos/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/itinysun/laravel-cos/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/itinysun/laravel-cos.svg?style=flat-square)](https://packagist.org/packages/itinysun/laravel-cos)
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
 
-## Support us
+## 一个使用腾讯云原生SDK实现的laravel文件存储扩展包,支持切片上传和下载
 
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/laravel-cos.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/laravel-cos)
 
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
+## Installation 安装
 
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
-
-## Installation
-
-You can install the package via composer:
+#### 使用composer 安装 You can install the package via composer:
 
 ```bash
 composer require itinysun/laravel-cos
 ```
 
-
-
-You can publish the config file with:
-
+#### 发布配置文件 You can publish the config file with:
 ```bash
 php artisan vendor:publish --tag="cos-config"
 ```
@@ -35,18 +26,67 @@ This is the contents of the published config file:
 
 ```php
 return [
+    'default' => [
+        'app_id' => env('COS_APP_ID'),
+        'secret_id' => env('COS_SECRET_ID'),
+        'secret_key' => env('COS_SECRET_KEY'),
+        'bucket' => env('COS_BUCKET'),  // 不带数字 app_id 后缀
+
+        'region' => 'ap-beijing',
+
+        // 可选，如果 bucket 为私有访问请打开此项
+        'signed_url' => true,
+
+        // 可选，是否使用 https，默认 false
+        'use_https' => true,
+
+        // 可选，自定义域名
+        'domain' => '',
+
+        // 可选，使用 CDN 域名时指定生成的 URL host
+        'cdn' => '',
+
+        'prefix' => '', // 全局路径前缀
+    ],
 ];
 ```
 
 ## Usage
 
 ```php
-$laravelCos = new Itinysun\LaravelCos('cos1');
+//直接使用cos客户端
+$laravelCos = new Itinysun\LaravelCos\Lib\LaravelCos('default');
+
+// 上传文件
+$laravelCos->uploadFile('test.txt', 'local/test.txt');
+
+//使用facade
+use Itinysun\LaravelCos\Facades\LaravelCos;
+LaravelCos::uploadFile('test.txt', 'local/test.txt');
+
+//使用laravel的storage
+//首先在config/filesystems.php 中添加一个 disk,config_name 是上面配置文件中的key
+        'cos_disk' => [
+            'driver' => 'cos',
+            'config_name' => 'cos_source',
+        ],
+
+//然后就可以使用laravel的storage了
+
 ```
 
 ## Testing
+扩展包使用[TestBench](https://packages.tools/getting-started.html)进行测试,不需要安装laravel
 
 ```bash
+### 发布测试文件
+composer build
+```
+### 填写一个cos配置到 test_config.php , 切记这个文件不要提交到版本控制,已经在.gitignore中忽略了
+```php
+
+```bash
+### 运行测试
 composer test
 ```
 
@@ -54,13 +94,6 @@ composer test
 
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
 
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
 
 ## Credits
 
