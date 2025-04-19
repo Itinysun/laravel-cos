@@ -89,6 +89,9 @@ readonly class LaravelCos
     }
 
 
+    /**
+     * @throws CosFilesystemException
+     */
     public function getFileAttr($key): ?FileAttr
     {
         try {
@@ -99,7 +102,15 @@ readonly class LaravelCos
             $data = $result->toArray();
             Log::debug('getFileAttr', ['data' => $data]);
             return FileAttr::from($data);
-        } catch (Exception $e) {
+        }catch (ServiceResponseException $serviceResponseException){
+            $msg = $serviceResponseException->getMessage();
+            if (str_contains($msg, 'key does not exist')) {
+                return null;
+            }
+            report($serviceResponseException);
+            throw new CosFilesystemException('getFileAttr failed: ' . $msg);
+        }
+        catch (Exception $e) {
             report($e);
             return null;
         }
@@ -441,7 +452,7 @@ readonly class LaravelCos
         return $url;
     }
 
-    public function tempUrl(string $key, ?Carbon $expireAt, array $params = [], array $headers = []): string
+    public function tempUrl(string $key, ?Carbon $expireAt = null, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
         $expireAt = $expireAt ?? Carbon::now()->addMinutes(30);
