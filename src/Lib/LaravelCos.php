@@ -100,7 +100,6 @@ readonly class LaravelCos
                 'Key' => $key,
             ]);
             $data = $result->toArray();
-            Log::debug('getFileAttr', ['data' => $data]);
             return FileAttr::from($data);
         }catch (ServiceResponseException $serviceResponseException){
             $msg = $serviceResponseException->getMessage();
@@ -151,7 +150,7 @@ readonly class LaravelCos
                         'Key' => $file->key,
                     ];
                 });
-                Log::warning('delete directory', ['path' => $path, 'sum' => $list->count(), 'list' => $list]);
+                Log::warning('delete directory', ['path' => $path, 'sum' => $list->count()]);
                 $this->client->deleteObjects([
                     'Bucket' => $this->bucket,
                     'Objects' => $list->toArray(),
@@ -426,7 +425,6 @@ readonly class LaravelCos
                 'MetadataDirective' => 'REPLACE',
             ];
             $options = $attr->toArray();
-            Log::debug('setFileAttr', ['data' => $data, 'options' => $options]);
             $this->client->copyObject(array_merge($options, $data));
         } catch (Exception $e) {
             report($e);
@@ -447,17 +445,13 @@ readonly class LaravelCos
     public function fixedUrl(string $key, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        $url = $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params' => $params, 'Headers' => $headers]);
-        Log::debug('fixUrl', ['url' => $url]);
-        return $url;
+        return $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params' => $params, 'Headers' => $headers]);
     }
 
     public function tempUrl(string $key, ?Carbon $expireAt = null, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
         $expireAt = $expireAt ?? Carbon::now()->addMinutes(30);
-        $url = $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(), ['Params' => $params, 'Headers' => $headers]);
-        Log::debug('tempUrl', ['url' => $url]);
-        return $url;
+        return $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(), ['Params' => $params, 'Headers' => $headers]);
     }
 }
