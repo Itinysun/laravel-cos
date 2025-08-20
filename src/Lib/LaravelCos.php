@@ -445,13 +445,54 @@ readonly class LaravelCos
     public function fixedUrl(string $key, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        return $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params' => $params, 'Headers' => $headers]);
+        $url = $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params' => $params, 'Headers' => $headers]);
+        
+        // 处理 CDN 配置
+        if (!empty($this->config['cdn'])) {
+            $url = $this->replaceDomainWithCdn($url);
+        }
+        
+        return $url;
     }
 
     public function tempUrl(string $key, ?Carbon $expireAt = null, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
         $expireAt = $expireAt ?? Carbon::now()->addMinutes(30);
-        return $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(), ['Params' => $params, 'Headers' => $headers]);
+        $url = $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(), ['Params' => $params, 'Headers' => $headers]);
+        
+        // 处理 CDN 配置
+        if (!empty($this->config['cdn'])) {
+            $url = $this->replaceDomainWithCdn($url);
+        }
+        
+        return $url;
+    }
+
+    /**
+     * 将 COS 域名替换为 CDN 域名
+     */
+    protected function replaceDomainWithCdn(string $url): string
+    {
+        $cdnDomain = rtrim($this->config['cdn'], '/');
+        
+        // 解析原始URL
+        $parsedUrl = parse_url($url);
+        if (!$parsedUrl) {
+            return $url;
+        }
+        
+        // 构建新的URL，保持路径、查询参数和片段
+        $newUrl = $cdnDomain . ($parsedUrl['path'] ?? '');
+        
+        if (!empty($parsedUrl['query'])) {
+            $newUrl .= '?' . $parsedUrl['query'];
+        }
+        
+        if (!empty($parsedUrl['fragment'])) {
+            $newUrl .= '#' . $parsedUrl['fragment'];
+        }
+        
+        return $newUrl;
     }
 }

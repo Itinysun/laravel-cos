@@ -52,6 +52,12 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
     {
         try {
             $this->cos->uploadData($path, $contents, config: $config->toArray());
+            
+            // 处理文件可见性设置
+            $visibility = $config->get('visibility');
+            if ($visibility !== null) {
+                $this->setVisibility($path, $visibility);
+            }
         } catch (UnableToWriteFile $e) {
             throw new UnableToWriteFile($path, $e);
         }

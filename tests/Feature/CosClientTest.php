@@ -125,6 +125,7 @@ describe('test cos sdk', function () {
         $str = \Illuminate\Support\Str::random();
         $laravelCos->uploadData($key, $str);
         $url = $laravelCos->fixedUrl($key, ['foo'=>'bar']);
+        dump($url);
         $hasParam = \Illuminate\Support\Str::contains($url, 'foo=bar');
         $this->assertTrue($hasParam);
     })->with($testFile);
