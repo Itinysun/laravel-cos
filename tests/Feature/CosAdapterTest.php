@@ -1,7 +1,6 @@
 <?php
-beforeEach(function () {
 
-})->skip(fn() => empty(config('cos.default')), 'cos_config.php is empty');
+beforeEach(function () {})->skip(fn () => empty(config('cos.default')), 'cos_config.php is empty');
 
 describe('test flysystem adapter', function () {
     $testFile = [

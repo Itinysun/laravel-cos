@@ -17,22 +17,30 @@ class FileCopyAttr extends Data
     #[WithCast(EnumCast::class)]
     #[WithTransformer(EnumTransformer::class)]
     public ?ObjectAcl $acl;
+
     #[mapName('CacheControl')]
     public ?string $cacheControl;
+
     #[mapName('ContentDisposition')]
     public ?string $contentDisposition;
+
     #[mapName('ContentEncoding')]
     public ?string $contentEncoding;
+
     #[mapName('ContentLanguage')]
     public ?string $contentLanguage;
+
     #[mapName('Expires')]
     public ?string $expires;
+
     #[mapName('Metadata')]
     public ?array $metadata;
+
     #[mapName('StorageClass')]
     #[WithCast(EnumCast::class)]
     #[WithTransformer(EnumTransformer::class)]
     public ?StorageClass $storageClass;
+
     #[mapName('ServerSideEncryption')]
     public ?string $serverSideEncryption;
 }

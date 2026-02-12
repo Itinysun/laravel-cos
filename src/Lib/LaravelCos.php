@@ -28,15 +28,15 @@ use Qcloud\Cos\Exception\ServiceResponseException;
 use RuntimeException;
 use Throwable;
 
-readonly class LaravelCos
+final class LaravelCos
 {
-    protected Client $client;
+    protected readonly Client $client;
 
-    protected array $config;
+    protected readonly array $config;
 
-    protected string $bucket;
+    protected readonly string $bucket;
 
-    protected PathPrefixer $prefixer;
+    protected readonly PathPrefixer $prefixer;
 
     /**
      * @throws CosFilesystemException
@@ -44,27 +44,36 @@ readonly class LaravelCos
     public function __construct($configName = null)
     {
         try {
-            if (!$configName) {
+            if (! $configName) {
                 $config = config('cos.default');
             } else {
-                $config = config('cos.' . $configName);
+                $config = config('cos.'.$configName);
             }
             if (empty($config)) {
-                throw new RuntimeException('you have to set cos config in config/cos.php');
+                throw new RuntimeException("COS config '$configName' not found in config/cos.php");
             }
+
+            // 验证必需配置项
+            $required = ['region', 'secret_id', 'secret_key', 'bucket', 'app_id'];
+            foreach ($required as $key) {
+                if (empty($config[$key])) {
+                    throw new RuntimeException("COS config '$key' is required but not set");
+                }
+            }
+
             $this->client = new Client([
                 'region' => $config['region'],
-                'schema' => $config['use_https'] ? 'https' : 'http',
+                'schema' => ($config['use_https'] ?? true) ? 'https' : 'http',
                 'credentials' => [
                     'secretId' => $config['secret_id'],
                     'secretKey' => $config['secret_key'],
                 ],
             ]);
-            $this->bucket = $config['bucket'] . '-' . $config['app_id'];
+            $this->bucket = $config['bucket'].'-'.$config['app_id'];
             $this->config = $config;
             $this->prefixer = new PathPrefixer($config['prefix'] ?? '');
         } catch (Exception $e) {
-            throw new CosFilesystemException('can not create cos client: ' . $e->getMessage());
+            throw new CosFilesystemException('Cannot create COS client: '.$e->getMessage());
         }
     }
 
@@ -88,7 +97,6 @@ readonly class LaravelCos
         return $this->prefixer;
     }
 
-
     /**
      * @throws CosFilesystemException
      */
@@ -100,17 +108,19 @@ readonly class LaravelCos
                 'Key' => $key,
             ]);
             $data = $result->toArray();
+
             return FileAttr::from($data);
-        }catch (ServiceResponseException $serviceResponseException){
-            $msg = $serviceResponseException->getMessage();
-            if (str_contains($msg, 'key does not exist')) {
+        } catch (ServiceResponseException $serviceResponseException) {
+            // 使用 HTTP 状态码而非消息字符串
+            $statusCode = $serviceResponseException->getStatusCode();
+            if ($statusCode === 404) {
                 return null;
             }
             report($serviceResponseException);
-            throw new CosFilesystemException('getFileAttr failed: ' . $msg);
-        }
-        catch (Exception $e) {
+            throw new CosFilesystemException('getFileAttr failed: '.$serviceResponseException->getMessage());
+        } catch (Exception $e) {
             report($e);
+
             return null;
         }
     }
@@ -118,8 +128,21 @@ readonly class LaravelCos
     public function directoryExists(string $path): bool
     {
         $prefixedPath = $this->prefixer->prefixDirectoryPath($path);
-        $attr = $this->getFileAttr($prefixedPath);
-        return $attr && $attr->key === $prefixedPath;
+        try {
+            $this->client->headObject([
+                'Bucket' => $this->bucket,
+                'Key' => $prefixedPath,
+            ]);
+
+            return true;
+        } catch (ServiceResponseException $e) {
+            $statusCode = $e->getStatusCode();
+            if ($statusCode === 404) {
+                return false;
+            }
+            report($e);
+            throw new CosFilesystemException('Check directory existence failed: '.$e->getMessage());
+        }
     }
 
     public function createDirectory(string $key): void
@@ -132,7 +155,7 @@ readonly class LaravelCos
             ]);
         } catch (Exception $e) {
             report($e);
-            throw new UnableToCreateDirectory('create directory failed: ' . $e->getMessage());
+            throw new UnableToCreateDirectory('create directory failed: '.$e->getMessage());
         }
     }
 
@@ -144,7 +167,7 @@ readonly class LaravelCos
         try {
             $files = $this->listObjects($path, true)?->getFiles();
             // Delete all files in the directory
-            if ($files && !$files->isEmpty()) {
+            if ($files && ! $files->isEmpty()) {
                 $list = $files->map(function ($file) {
                     return [
                         'Key' => $file->key,
@@ -163,7 +186,7 @@ readonly class LaravelCos
             ]);
         } catch (Exception $e) {
             report($e);
-            throw new UnableToDeleteDirectory('Delete directory failed: ' . $e->getMessage());
+            throw new UnableToDeleteDirectory('Delete directory failed: '.$e->getMessage());
         }
     }
 
@@ -180,9 +203,10 @@ readonly class LaravelCos
             $data = $result->toArray();
         } catch (ServiceResponseException $e) {
             report($e);
+
             return null;
         }
-        if (!$data && !is_array($data)) {
+        if (empty($data) || ! is_array($data)) {
             return null;
         }
         try {
@@ -190,10 +214,12 @@ readonly class LaravelCos
             if ($list->isTruncated) {
                 throw new CosFilesystemException('List is truncated, please use pagination');
             }
+
             return $list;
         } catch (Exception $e) {
-            Log::error('Error when parsing listObjects response: ' . $e->getMessage());
+            Log::error('Error when parsing listObjects response: '.$e->getMessage());
             report($e);
+
             return null;
         }
     }
@@ -202,6 +228,7 @@ readonly class LaravelCos
     {
         $prefixedPath = $this->prefixer->prefixPath($path);
         $attr = $this->getFileAttr($prefixedPath);
+
         return $attr && $attr->key === $prefixedPath;
     }
 
@@ -211,13 +238,16 @@ readonly class LaravelCos
     public function uploadFile($key, $filePath): void
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             throw new FileNotFoundException("File not found: $filePath");
         }
         $handle = fopen($filePath, 'rb');
-        $this->client->upload($this->bucket, $prefixedPath, $handle);
-        if (is_resource($handle)) {
-            @fclose($handle);
+        try {
+            $this->client->upload($this->bucket, $prefixedPath, $handle);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
         }
     }
 
@@ -244,7 +274,7 @@ readonly class LaravelCos
             $this->client->putObject($opt);
         } catch (Throwable $e) {
             report($e);
-            throw new UnableToWriteFile('Upload failed: ' . $e->getMessage());
+            throw new UnableToWriteFile('Upload failed: '.$e->getMessage());
         }
     }
 
@@ -256,12 +286,12 @@ readonly class LaravelCos
         $prefixedPath = $this->prefixer->prefixPath($key);
         try {
             $this->client->download($this->bucket, $prefixedPath, $target, [
-                'PartSize' => 20 * 1024 * 1024, // 分块大小
-                'Concurrency' => 1, // 并发数
+                'PartSize' => $this->config['chunk_size'] ?? 20 * 1024 * 1024, // 分块大小
+                'Concurrency' => $this->config['concurrency'] ?? 5, // 并发数
             ]);
         } catch (Throwable $e) {
             report($e);
-            throw new UnableToReadFile('Download failed: ' . $e->getMessage());
+            throw new UnableToReadFile('Download failed: '.$e->getMessage());
         }
     }
 
@@ -277,7 +307,7 @@ readonly class LaravelCos
             return $result['Body'];
         } catch (Exception $e) {
             report($e);
-            throw UnableToReadFile::fromLocation($prefixedPath, (string)$e);
+            throw UnableToReadFile::fromLocation($prefixedPath, (string) $e);
         }
     }
 
@@ -296,7 +326,7 @@ readonly class LaravelCos
             return ImageInfo::from($result['Data']);
         } catch (Exception $e) {
             report($e);
-            throw new RuntimeException('Get pic info failed: ' . $e->getMessage());
+            throw new RuntimeException('Get pic info failed: '.$e->getMessage());
         }
     }
 
@@ -307,7 +337,7 @@ readonly class LaravelCos
             $this->copy($from, $to, $attr);
             $this->delete($from);
         } catch (Exception $e) {
-            throw new UnableToMoveFile('Move failed: ' . $e->getMessage());
+            throw new UnableToMoveFile('Move failed: '.$e->getMessage());
         }
     }
 
@@ -323,9 +353,9 @@ readonly class LaravelCos
             ];
             if ($attr) {
                 $data = array_merge($data, $attr->toArray());
-                //if we have metadata,original file's metadata will be replaced
-                //if we don't have metadata,original file's metadata will be copied
-                if (!empty($attr->metadata)) {
+                // if we have metadata,original file's metadata will be replaced
+                // if we don't have metadata,original file's metadata will be copied
+                if (! empty($attr->metadata)) {
                     $data['MetadataDirective'] = 'REPLACE';
                 } else {
                     $data['MetadataDirective'] = 'COPY';
@@ -334,7 +364,7 @@ readonly class LaravelCos
             $this->client->copy($this->bucket, $prefixedTo, $data);
         } catch (Exception $e) {
             report($e);
-            throw new UnableToCopyFile('Copy failed: ' . $e->getMessage());
+            throw new UnableToCopyFile('Copy failed: '.$e->getMessage());
         }
     }
 
@@ -351,7 +381,7 @@ readonly class LaravelCos
             ]);
         } catch (ServiceResponseException $e) {
             report($e);
-            throw new UnableToDeleteFile('Delete failed: ' . $e->getMessage());
+            throw new UnableToDeleteFile('Delete failed: '.$e->getMessage());
         }
     }
 
@@ -369,7 +399,7 @@ readonly class LaravelCos
             ]);
         } catch (Exception $e) {
             report($e);
-            throw new CosFilesystemException('setFileAcl failed: ' . $e->getMessage());
+            throw new CosFilesystemException('setFileAcl failed: '.$e->getMessage());
         }
     }
 
@@ -386,7 +416,7 @@ readonly class LaravelCos
             ]);
             $grants = Arr::get($result->toArray(), 'Grants', []);
         } catch (Exception $e) {
-            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
+            throw new CosFilesystemException('getFileAcl failed: '.$e->getMessage());
         }
         if (empty($grants)) {
             throw new CosFilesystemException('getFileAcl failed,no grants found');
@@ -404,10 +434,11 @@ readonly class LaravelCos
                     }
                 }
             }
+
             // Default to private if no public permission found
             return ObjectAcl::PRIVATE;
         } catch (Exception $e) {
-            throw new CosFilesystemException('getFileAcl failed: ' . $e->getMessage());
+            throw new CosFilesystemException('getFileAcl failed: '.$e->getMessage());
         }
     }
 
@@ -428,7 +459,7 @@ readonly class LaravelCos
             $this->client->copyObject(array_merge($options, $data));
         } catch (Exception $e) {
             report($e);
-            throw new CosFilesystemException('setFileAttr failed: ' . $e->getMessage());
+            throw new CosFilesystemException('setFileAttr failed: '.$e->getMessage());
         }
     }
 
@@ -436,22 +467,22 @@ readonly class LaravelCos
     {
         $full = "$this->bucket.cos.{$this->config['region']}.myqcloud.com/$key";
         if ($version) {
-            $full .= '?versionId=' . $version;
+            $full .= '?versionId='.$version;
         }
+
         return $full;
     }
-
 
     public function fixedUrl(string $key, array $params = [], array $headers = []): string
     {
         $prefixedPath = $this->prefixer->prefixPath($key);
         $url = $this->client->getObjectUrlWithoutSign($this->bucket, $prefixedPath, ['Params' => $params, 'Headers' => $headers]);
-        
+
         // 处理 CDN 配置
-        if (!empty($this->config['cdn'])) {
+        if (! empty($this->config['cdn'])) {
             $url = $this->replaceDomainWithCdn($url);
         }
-        
+
         return $url;
     }
 
@@ -460,12 +491,12 @@ readonly class LaravelCos
         $prefixedPath = $this->prefixer->prefixPath($key);
         $expireAt = $expireAt ?? Carbon::now()->addMinutes(30);
         $url = $this->client->getObjectUrl($this->bucket, $prefixedPath, $expireAt->toDateTimeString(), ['Params' => $params, 'Headers' => $headers]);
-        
+
         // 处理 CDN 配置
-        if (!empty($this->config['cdn'])) {
+        if (! empty($this->config['cdn'])) {
             $url = $this->replaceDomainWithCdn($url);
         }
-        
+
         return $url;
     }
 
@@ -475,24 +506,24 @@ readonly class LaravelCos
     protected function replaceDomainWithCdn(string $url): string
     {
         $cdnDomain = rtrim($this->config['cdn'], '/');
-        
+
         // 解析原始URL
         $parsedUrl = parse_url($url);
-        if (!$parsedUrl) {
+        if (! $parsedUrl) {
             return $url;
         }
-        
+
         // 构建新的URL，保持路径、查询参数和片段
-        $newUrl = $cdnDomain . ($parsedUrl['path'] ?? '');
-        
-        if (!empty($parsedUrl['query'])) {
-            $newUrl .= '?' . $parsedUrl['query'];
+        $newUrl = $cdnDomain.($parsedUrl['path'] ?? '');
+
+        if (! empty($parsedUrl['query'])) {
+            $newUrl .= '?'.$parsedUrl['query'];
         }
-        
-        if (!empty($parsedUrl['fragment'])) {
-            $newUrl .= '#' . $parsedUrl['fragment'];
+
+        if (! empty($parsedUrl['fragment'])) {
+            $newUrl .= '#'.$parsedUrl['fragment'];
         }
-        
+
         return $newUrl;
     }
 }

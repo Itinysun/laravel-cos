@@ -19,9 +19,10 @@ use League\Flysystem\UnableToWriteFile;
 use League\Flysystem\UrlGeneration\PublicUrlGenerator;
 use League\Flysystem\UrlGeneration\TemporaryUrlGenerator;
 use League\Flysystem\Visibility;
+
 use function stream_get_contents;
 
-class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,PublicUrlGenerator
+class CosFilesystemAdapter implements FilesystemAdapter, PublicUrlGenerator, TemporaryUrlGenerator
 {
     protected LaravelCos $cos;
 
@@ -52,7 +53,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
     {
         try {
             $this->cos->uploadData($path, $contents, config: $config->toArray());
-            
+
             // 处理文件可见性设置
             $visibility = $config->get('visibility');
             if ($visibility !== null) {
@@ -67,8 +68,8 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
     {
         $contents = $this->read($path);
         try {
-            // 使用 fopen 打开一个内存资源，以读写模式（'r+'）打开
-            $stream = fopen('php://memory', 'rb+');
+            // php://temp 超过 2MB 自动写入磁盘，避免大文件内存溢出
+            $stream = fopen('php://temp', 'rb+');
             // 将字符串写入到流中
             fwrite($stream, $contents);
             // 将文件指针重置到流的开头，以便可以从头开始读取
@@ -76,7 +77,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
 
             return $stream;
         } catch (Exception $e) {
-            throw new CosFilesystemException($path, $e);
+            throw UnableToReadFile::fromLocation($path, $e->getMessage(), $e);
         }
     }
 
@@ -117,7 +118,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
         try {
             $this->cos->setFileAcl($path, ObjectAcl::fromVisibility($visibility));
         } catch (Exception $e) {
-            throw new CosFilesystemException('Set visibility failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Set visibility failed: '.$e->getMessage());
         }
     }
 
@@ -130,11 +131,10 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
             if ($acl === ObjectAcl::PUBLIC_READ) {
                 return new FileAttributes($prefixedPath, null, Visibility::PUBLIC);
             }
-            {
-                return new FileAttributes($prefixedPath, null, Visibility::PRIVATE);
-            }
+
+            return new FileAttributes($prefixedPath, null, Visibility::PRIVATE);
         } catch (Exception $e) {
-            throw new CosFilesystemException('Get visibility failed: ' . $e->getMessage());
+            throw new CosFilesystemException('Get visibility failed: '.$e->getMessage());
         }
     }
 
@@ -144,6 +144,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
         if ($attr === null || empty($attr->contentType)) {
             throw UnableToRetrieveMetadata::mimeType($path, 'Unable to retrieve mime type');
         }
+
         return $attr->toFileAttributes();
 
     }
@@ -166,15 +167,13 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
         }
 
         throw UnableToRetrieveMetadata::fileSize($path, 'Unable to retrieve file size');
-
     }
 
     public function listContents(string $path, bool $deep): iterable
     {
         try {
             $contents = $this->cos->listObjects($path, $deep);
-            if($contents===null)
-            {
+            if ($contents === null) {
                 return [];
             }
             foreach ($contents->getFiles() as $content) {
@@ -184,7 +183,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
                 yield new FileAttributes($content->key, null, null, null, true);
             }
         } catch (Exception $e) {
-            throw new CosFilesystemException('List contents failed: ' . $e->getMessage());
+            throw new CosFilesystemException('List contents failed: '.$e->getMessage());
         }
     }
 
@@ -205,7 +204,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
 
     public function getTemporaryUrl(string $path, DateTimeInterface $expiresAt, array $config): string
     {
-        return $this->temporaryUrl($path, $expiresAt,new Config($config));
+        return $this->temporaryUrl($path, $expiresAt, new Config($config));
     }
 
     public function publicUrl(string $path, Config $config): string
@@ -215,6 +214,6 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
 
     public function getUrl(string $path): string
     {
-        return $this->publicUrl($path, new Config());
+        return $this->publicUrl($path, new Config);
     }
 }

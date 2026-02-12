@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @see \Itinysun\LaravelCos\Lib\LaravelCos
+ *
  * @mixin \Itinysun\LaravelCos\Lib\LaravelCos
  */
 class LaravelCos extends Facade
