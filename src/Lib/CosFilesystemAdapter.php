@@ -58,8 +58,8 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
             if ($visibility !== null) {
                 $this->setVisibility($path, $visibility);
             }
-        } catch (UnableToWriteFile $e) {
-            throw new UnableToWriteFile($path, $e);
+        } catch (Exception $e) {
+            throw UnableToWriteFile::atLocation($path, $e->getMessage(), $e);
         }
     }
 
@@ -85,7 +85,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
         try {
             return $this->cos->getData($path);
         } catch (Exception $e) {
-            throw new UnableToReadFile($path, $e->getCode(), $e);
+            throw UnableToReadFile::fromLocation($path, $e->getMessage(), $e);
         }
     }
 
@@ -94,7 +94,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
         try {
             $this->cos->delete($path);
         } catch (Exception $e) {
-            throw new UnableToDeleteFile($path, $e);
+            throw UnableToDeleteFile::atLocation($path, $e->getMessage(), $e);
         }
     }
 
@@ -103,7 +103,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
         try {
             $this->cos->deleteDirectory($path);
         } catch (Exception $e) {
-            throw new UnableToDeleteDirectory($path, $e);
+            throw UnableToDeleteDirectory::atLocation($path, $e->getMessage(), $e);
         }
     }
 
@@ -142,7 +142,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
     {
         $attr = $this->cos->getFileAttr($path);
         if ($attr === null || empty($attr->contentType)) {
-            throw new UnableToRetrieveMetadata('Get mime type failed: ' . $path);
+            throw UnableToRetrieveMetadata::mimeType($path, 'Unable to retrieve mime type');
         }
         return $attr->toFileAttributes();
 
@@ -155,7 +155,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
             return $attr->toFileAttributes();
         }
 
-        throw new UnableToRetrieveMetadata('Get last modified failed: ' . $path);
+        throw UnableToRetrieveMetadata::lastModified($path, 'Unable to retrieve last modified time');
     }
 
     public function fileSize(string $path): FileAttributes
@@ -165,7 +165,7 @@ class CosFilesystemAdapter implements FilesystemAdapter, TemporaryUrlGenerator,P
             return $attr->toFileAttributes();
         }
 
-        throw new UnableToRetrieveMetadata('Get file size failed: ' . $path);
+        throw UnableToRetrieveMetadata::fileSize($path, 'Unable to retrieve file size');
 
     }
 
